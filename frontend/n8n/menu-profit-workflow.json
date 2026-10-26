@@ -1,0 +1,507 @@
+{
+  "name": "Menu Profit Audit",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "menu-profit-audit",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "1a1f1a10-0001-4000-8000-000000000001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-1600, 0],
+      "webhookId": "menu-profit-audit"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Rejects the request unless it carries the shared secret Next.js sends.\n// Set MENU_PROFIT_WEBHOOK_SECRET in n8n's environment variables (Settings\n// > Variables, or the process env of your n8n host) to the SAME value as\n// Next.js's N8N_WEBHOOK_SECRET. Never hardcode the secret here.\nconst expected = $env.MENU_PROFIT_WEBHOOK_SECRET;\nconst provided = $input.first().json.headers['x-webhook-secret'];\n\nif (!expected) {\n  throw new Error('MENU_PROFIT_WEBHOOK_SECRET is not set on this n8n instance.');\n}\nif (provided !== expected) {\n  throw new Error('Invalid or missing x-webhook-secret header.');\n}\n\nconst body = $input.first().json.body ?? {};\nconst auditId = body.auditId;\nif (!auditId || typeof auditId !== 'string') {\n  throw new Error('Request body is missing auditId.');\n}\n\nreturn [{ json: { auditId } }];"
+      },
+      "id": "1a1f1a10-0001-4000-8000-000000000002",
+      "name": "Validate Secret",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-1360, 0],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"accepted\": true, \"auditId\": $json.auditId } }}",
+        "options": { "responseCode": 202 }
+      },
+      "id": "1a1f1a10-0001-4000-8000-000000000003",
+      "name": "Respond Accepted",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [-1120, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Deterministic parsing for the slots that are already tabular\n// (Excel/CSV) — no AI involved here, exactly per the spec's\n// \"calculate using deterministic code, not AI\" requirement for\n// anything that doesn't genuinely need it. PDF/image files are\n// passed through untouched for the AI-extraction branch instead.\nconst XLSX = require('xlsx');\n\nconst webhookItem = $('Webhook').first();\nconst binaries = webhookItem.binary || {};\nconst auditId = $json.auditId;\n\nfunction isSpreadsheet(mimeType) {\n  return (\n    mimeType === 'text/csv' ||\n    mimeType === 'application/vnd.ms-excel' ||\n    mimeType ===\n      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'\n  );\n}\n\nfunction parseSheet(buffer) {\n  const wb = XLSX.read(buffer, { type: 'buffer' });\n  const sheet = wb.Sheets[wb.SheetNames[0]];\n  return XLSX.utils.sheet_to_json(sheet, { defval: null });\n}\n\nconst menuRows = [];\nconst posRows = [];\nconst invoiceRows = [];\nconst filesNeedingAi = []; // { slot, fileName, mimeType, base64 }\n\nfor (const [key, binary] of Object.entries(binaries)) {\n  const slot = key.startsWith('invoices')\n    ? 'invoices'\n    : key.startsWith('menu')\n      ? 'menu'\n      : key.startsWith('pos')\n        ? 'pos'\n        : null;\n  if (!slot) continue;\n\n  const buffer = Buffer.from(binary.data, 'base64');\n\n  if (isSpreadsheet(binary.mimeType)) {\n    const rows = parseSheet(buffer);\n    if (slot === 'menu') menuRows.push(...rows.map((r) => ({ ...r, __source: binary.fileName })));\n    if (slot === 'pos') posRows.push(...rows.map((r) => ({ ...r, __source: binary.fileName })));\n    if (slot === 'invoices') invoiceRows.push(...rows.map((r) => ({ ...r, __source: binary.fileName })));\n  } else {\n    // PDF or image — needs the AI-extraction branch.\n    filesNeedingAi.push({\n      slot,\n      fileName: binary.fileName,\n      mimeType: binary.mimeType,\n      base64: binary.data,\n    });\n  }\n}\n\nreturn [\n  {\n    json: {\n      auditId,\n      menuRows,\n      posRows,\n      invoiceRows,\n      filesNeedingAi,\n      needsAiExtraction: filesNeedingAi.length > 0,\n    },\n  },\n];"
+      },
+      "id": "1a1f1a10-0001-4000-8000-000000000004",
+      "name": "Parse Spreadsheet Files",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-1360, 220],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.needsAiExtraction }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1a1f1a10-0001-4000-8000-000000000005",
+      "name": "Needs AI Extraction?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-1120, 220]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: 'claude-sonnet-4-5',\n  max_tokens: 4096,\n  messages: [{\n    role: 'user',\n    content: [\n      ...$json.filesNeedingAi.map(f => (\n        f.mimeType.startsWith('image/')\n          ? { type: 'image', source: { type: 'base64', media_type: f.mimeType, data: f.base64 } }\n          : { type: 'document', source: { type: 'base64', media_type: f.mimeType, data: f.base64 } }\n      )),\n      { type: 'text', text: 'Extract structured data from these restaurant documents. For each menu document, return item name, description, category, and selling price. For each invoice document, return ingredient name, quantity, unit, pack size, and price. Respond with ONLY a JSON object of the shape {\\\"menuItems\\\": [...], \\\"invoiceLines\\\": [...]}. If a value is unreadable or missing, use null for that field rather than guessing \\u2014 do not invent numbers.' }\n    ]\n  }]\n}) }}",
+        "options": { "timeout": 60000 }
+      },
+      "id": "1a1f1a10-0001-4000-8000-000000000006",
+      "name": "Claude: Extract Document Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-880, 160],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "PLACEHOLDER_CREDENTIAL_ID",
+          "name": "Anthropic API Key (x-api-key header)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Claude is asked to return ONLY a JSON object; this just parses it\n// defensively. A malformed response doesn't crash the workflow — it\n// routes the audit to \"review_required\" instead (see the Merge step),\n// per \"flag uncertain matches instead of inventing facts\".\nlet aiMenuItems = [];\nlet aiInvoiceLines = [];\nlet aiParseError = null;\n\ntry {\n  const text = $json.content?.[0]?.text ?? '';\n  const match = text.match(/\\{[\\s\\S]*\\}/);\n  const parsed = JSON.parse(match ? match[0] : text);\n  aiMenuItems = Array.isArray(parsed.menuItems) ? parsed.menuItems : [];\n  aiInvoiceLines = Array.isArray(parsed.invoiceLines) ? parsed.invoiceLines : [];\n} catch (error) {\n  aiParseError = String(error);\n}\n\nreturn [{ json: { aiMenuItems, aiInvoiceLines, aiParseError } }];"
+      },
+      "id": "1a1f1a10-0001-4000-8000-000000000007",
+      "name": "Parse Claude Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-640, 160],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// The \"no AI needed\" branch — keep the output shape identical to\n// \"Parse Claude Response\" so the next node doesn't need to know which\n// branch ran.\nreturn [{ json: { aiMenuItems: [], aiInvoiceLines: [], aiParseError: null } }];"
+      },
+      "id": "1a1f1a10-0001-4000-8000-000000000008",
+      "name": "No AI Needed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-880, 280]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combines the deterministically-parsed spreadsheet rows with whatever\n// Claude extracted from PDFs/images into one consistent shape. Field\n// names here intentionally mirror lib/audit/calculations.ts's inputs —\n// keep both in sync by hand (see n8n/README.md \"Known limitations\").\nconst parsed = $('Parse Spreadsheet Files').first().json;\nconst ai = $json; // aiMenuItems / aiInvoiceLines / aiParseError\n\nfunction toNumber(v) {\n  if (v === null || v === undefined || v === '') return null;\n  const n = Number(String(v).replace(/[^0-9.\\-]/g, ''));\n  return Number.isFinite(n) ? n : null;\n}\n\nconst menuItems = [\n  ...parsed.menuRows.map((r) => ({\n    name: r.name ?? r.Item ?? r['Item Name'] ?? null,\n    category: r.category ?? r.Category ?? null,\n    sellingPrice: toNumber(r.price ?? r.Price ?? r['Selling Price']),\n    source: 'spreadsheet',\n  })),\n  ...ai.aiMenuItems.map((r) => ({\n    name: r.name ?? null,\n    category: r.category ?? null,\n    sellingPrice: toNumber(r.sellingPrice ?? r.price),\n    source: 'ai',\n  })),\n].filter((item) => item.name);\n\nconst ingredients = [\n  ...parsed.invoiceRows.map((r) => ({\n    name: r.ingredient ?? r.Ingredient ?? r['Item'] ?? null,\n    quantity: toNumber(r.quantity ?? r.Quantity),\n    unit: r.unit ?? r.Unit ?? null,\n    packSize: r.packSize ?? r['Pack Size'] ?? null,\n    price: toNumber(r.price ?? r.Price),\n    source: 'spreadsheet',\n  })),\n  ...ai.aiInvoiceLines.map((r) => ({\n    name: r.ingredientName ?? r.name ?? null,\n    quantity: toNumber(r.quantity),\n    unit: r.unit ?? null,\n    packSize: r.packSize ?? null,\n    price: toNumber(r.price),\n    source: 'ai',\n  })),\n].filter((item) => item.name);\n\nconst posSales = parsed.posRows.map((r) => ({\n  name: r.item ?? r.Item ?? r['Item Name'] ?? null,\n  unitsSold: toNumber(r.units ?? r.Units ?? r['Units Sold']),\n  revenue: toNumber(r.revenue ?? r.Revenue),\n})).filter((item) => item.name);\n\nconst reviewRequired = ai.aiParseError\n  ? [{ reason: 'AI extraction response could not be parsed', detail: ai.aiParseError }]\n  : [];\n\nreturn [{\n  json: {\n    auditId: parsed.auditId,\n    menuItems,\n    ingredients,\n    posSales,\n    reviewRequired,\n  },\n}];"
+      },
+      "id": "1a1f1a10-0001-4000-8000-000000000009",
+      "name": "Merge Extraction Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-400, 220],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Matches each menu item to its ingredients (by substring/word-overlap\n// name matching — good enough for Phase 1, not a real NLP matcher) and\n// to its POS sales row. Anything that doesn't match confidently is\n// pushed into reviewRequired rather than guessed at.\nconst { auditId, menuItems, ingredients, posSales, reviewRequired } = $json;\n\nfunction normalize(s) {\n  return String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();\n}\n\nfunction findBestMatch(name, candidates) {\n  const target = normalize(name);\n  let best = null;\n  let bestScore = 0;\n  for (const c of candidates) {\n    const candidateName = normalize(c.name);\n    if (!candidateName) continue;\n    const score = target === candidateName ? 1 : (target.includes(candidateName) || candidateName.includes(target)) ? 0.7 : 0;\n    if (score > bestScore) {\n      bestScore = score;\n      best = c;\n    }\n  }\n  return bestScore >= 0.7 ? best : null;\n}\n\nconst review = [...reviewRequired];\nconst matched = menuItems.map((item) => {\n  const posMatch = findBestMatch(item.name, posSales);\n  if (!posMatch) {\n    review.push({ reason: 'No POS sales match', item: item.name });\n  }\n\n  // A menu item can use several ingredients; Phase 1 assumes a 1:1\n  // name match per line (e.g. a \"Cheeseburger\" menu item matching a\n  // \"Cheeseburger\" ingredient costing row) rather than a real recipe/BOM.\n  // Real recipe composition is Phase 2 scope — see n8n/README.md.\n  const ingredientMatch = findBestMatch(item.name, ingredients);\n  if (!ingredientMatch) {\n    review.push({ reason: 'No supplier cost match', item: item.name });\n  }\n\n  return {\n    name: item.name,\n    category: item.category,\n    sellingPrice: item.sellingPrice,\n    unitsSold: posMatch ? posMatch.unitsSold : null,\n    ingredientCost: ingredientMatch ? ingredientMatch.price : null,\n    ingredientName: ingredientMatch ? ingredientMatch.name : null,\n  };\n});\n\nreturn [{ json: { auditId, matchedItems: matched, ingredients, reviewRequired: review } }];"
+      },
+      "id": "1a1f1a10-0001-4000-8000-00000000000a",
+      "name": "Match Ingredients & Sales",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-160, 220],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Same formulas as lib/audit/calculations.ts in the Next.js app —\n// deliberately duplicated (different runtime) rather than shared.\n// Keep both in sync by hand; see n8n/README.md \"Known limitations\".\nconst { auditId, matchedItems, reviewRequired } = $json;\n\nfunction gp(item) {\n  if (item.sellingPrice == null || item.ingredientCost == null) return null;\n  return item.sellingPrice - item.ingredientCost;\n}\nfunction gpPercent(item, grossProfit) {\n  if (item.sellingPrice == null || !item.sellingPrice || grossProfit == null) return null;\n  return (grossProfit / item.sellingPrice) * 100;\n}\n\nconst totalUnits = matchedItems.reduce((sum, i) => sum + (i.unitsSold ?? 0), 0);\n\nconst costing = matchedItems.map((item) => {\n  const grossProfit = gp(item);\n  const gpPct = gpPercent(item, grossProfit);\n  const totalGpContribution = grossProfit != null && item.unitsSold != null ? grossProfit * item.unitsSold : null;\n  const salesMix = item.unitsSold != null && totalUnits > 0 ? (item.unitsSold / totalUnits) * 100 : null;\n\n  return {\n    name: item.name,\n    category: item.category,\n    sellingPrice: item.sellingPrice,\n    ingredientCost: item.ingredientCost,\n    grossProfitPerPortion: grossProfit,\n    gpPercent: gpPct,\n    unitsSold: item.unitsSold,\n    totalGpContribution,\n    salesMixPercent: salesMix,\n    confidence: item.sellingPrice != null && item.ingredientCost != null && item.unitsSold != null ? 'verified' : 'incomplete',\n  };\n});\n\nconst summary = {\n  auditId,\n  totalItems: matchedItems.length,\n  itemsVerified: costing.filter((c) => c.confidence === 'verified').length,\n  itemsIncomplete: costing.filter((c) => c.confidence === 'incomplete').length,\n  totalUnitsSold: totalUnits,\n  totalGpContribution: costing.reduce((sum, c) => sum + (c.totalGpContribution ?? 0), 0),\n  reviewItemCount: reviewRequired.length,\n  generatedAt: new Date().toISOString(),\n};\n\nreturn [{ json: { auditId, costing, summary, reviewRequired } }];"
+      },
+      "id": "1a1f1a10-0001-4000-8000-00000000000b",
+      "name": "Calculate Profitability",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [80, 220],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": { "mode": "id", "value": "PLACEHOLDER_GOOGLE_SHEET_ID" },
+        "sheetName": { "mode": "name", "value": "Costing & Profit" },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "matchingColumns": ["name"]
+        },
+        "options": {}
+      },
+      "id": "1a1f1a10-0001-4000-8000-00000000000c",
+      "name": "Sheets: Costing & Profit",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [340, 100],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PLACEHOLDER_CREDENTIAL_ID",
+          "name": "Google Sheets (Menu Profit)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": { "mode": "id", "value": "PLACEHOLDER_GOOGLE_SHEET_ID" },
+        "sheetName": { "mode": "name", "value": "Review Required" },
+        "columns": { "mappingMode": "autoMapInputData" },
+        "options": {}
+      },
+      "id": "1a1f1a10-0001-4000-8000-00000000000d",
+      "name": "Sheets: Review Required",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [340, 260],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PLACEHOLDER_CREDENTIAL_ID",
+          "name": "Google Sheets (Menu Profit)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": { "mode": "id", "value": "PLACEHOLDER_GOOGLE_SHEET_ID" },
+        "sheetName": { "mode": "name", "value": "Audit Summary" },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "matchingColumns": ["auditId"]
+        },
+        "options": {}
+      },
+      "id": "1a1f1a10-0001-4000-8000-00000000000e",
+      "name": "Sheets: Audit Summary",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [340, 420],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PLACEHOLDER_CREDENTIAL_ID",
+          "name": "Google Sheets (Menu Profit)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Builds the downloadable .xlsx using exceljs — a self-hosted-n8n-only\n// capability (Code nodes on n8n Cloud can't require npm packages).\n// If you're on n8n Cloud instead, replace this node with an HTTP\n// Request to a conversion service, or export straight from the Google\n// Sheet created above (File > Download > .xlsx) as a manual fallback.\nconst ExcelJS = require('exceljs');\n\nconst { auditId, costing, summary, reviewRequired } = $('Calculate Profitability').first().json;\n\nconst wb = new ExcelJS.Workbook();\n\nconst costingSheet = wb.addWorksheet('Costing & Profit');\ncostingSheet.columns = [\n  { header: 'Item', key: 'name', width: 28 },\n  { header: 'Category', key: 'category', width: 16 },\n  { header: 'Selling Price', key: 'sellingPrice', width: 14 },\n  { header: 'Ingredient Cost', key: 'ingredientCost', width: 16 },\n  { header: 'GP / Portion', key: 'grossProfitPerPortion', width: 14 },\n  { header: 'GP %', key: 'gpPercent', width: 10 },\n  { header: 'Units Sold', key: 'unitsSold', width: 12 },\n  { header: 'Total GP Contribution', key: 'totalGpContribution', width: 18 },\n  { header: 'Sales Mix %', key: 'salesMixPercent', width: 12 },\n  { header: 'Confidence', key: 'confidence', width: 12 },\n];\ncosting.forEach((row) => costingSheet.addRow(row));\n\nconst reviewSheet = wb.addWorksheet('Review Required');\nreviewSheet.columns = [\n  { header: 'Item', key: 'item', width: 28 },\n  { header: 'Reason', key: 'reason', width: 40 },\n  { header: 'Detail', key: 'detail', width: 40 },\n];\nreviewRequired.forEach((row) => reviewSheet.addRow(row));\n\nconst summarySheet = wb.addWorksheet('Audit Summary');\nsummarySheet.columns = [\n  { header: 'Field', key: 'field', width: 24 },\n  { header: 'Value', key: 'value', width: 40 },\n];\nObject.entries(summary).forEach(([field, value]) => summarySheet.addRow({ field, value }));\n\nconst buffer = await wb.xlsx.writeBuffer();\n\nreturn [{\n  json: { auditId, fileName: `Menu-Profit-Report-${auditId}.xlsx` },\n  binary: {\n    report: {\n      data: Buffer.from(buffer).toString('base64'),\n      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',\n      fileName: `Menu-Profit-Report-${auditId}.xlsx`,\n    },\n  },\n}];"
+      },
+      "id": "1a1f1a10-0001-4000-8000-00000000000f",
+      "name": "Generate Excel Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [600, 220],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.MENU_PROFIT_CALLBACK_BASE_URL + '/api/audits/' + $json.auditId + '/callback' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-callback-secret", "value": "={{ $env.MENU_PROFIT_CALLBACK_SECRET }}" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            { "parameterType": "formData", "name": "status", "value": "completed" },
+            { "parameterType": "formData", "name": "message", "value": "Audit completed." },
+            { "parameterType": "formBinaryData", "name": "report", "inputDataFieldName": "report" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1a1f1a10-0001-4000-8000-000000000010",
+      "name": "Send Completed Callback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [840, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Shared landing spot for every node's error output (wired below).\n// Figures out which audit this was for, so the failure can still be\n// reported back even though the main happy-path never reached the end.\nconst error = $json.error ?? String($json);\nconst auditId = $('Webhook').first()?.json?.body?.auditId ?? $('Parse Spreadsheet Files').first()?.json?.auditId ?? null;\n\nreturn [{ json: { auditId, message: typeof error === 'string' ? error : JSON.stringify(error) } }];"
+      },
+      "id": "1a1f1a10-0001-4000-8000-000000000011",
+      "name": "Build Failure Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-160, 600]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.MENU_PROFIT_CALLBACK_BASE_URL + '/api/audits/' + $json.auditId + '/callback' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-callback-secret", "value": "={{ $env.MENU_PROFIT_CALLBACK_SECRET }}" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            { "parameterType": "formData", "name": "status", "value": "failed" },
+            { "parameterType": "formData", "name": "message", "value": "={{ $json.message }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1a1f1a10-0001-4000-8000-000000000012",
+      "name": "Send Failed Callback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [80, 600]
+    },
+    {
+      "parameters": { "fieldToSplitOut": "menuItems" },
+      "id": "1a1f1a10-0001-4000-8000-000000000013",
+      "name": "Split Out: Menu Items",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [-160, -80]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": { "mode": "id", "value": "PLACEHOLDER_GOOGLE_SHEET_ID" },
+        "sheetName": { "mode": "name", "value": "Menu Items" },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "matchingColumns": ["name"]
+        },
+        "options": {}
+      },
+      "id": "1a1f1a10-0001-4000-8000-000000000014",
+      "name": "Sheets: Menu Items",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [80, -80],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PLACEHOLDER_CREDENTIAL_ID",
+          "name": "Google Sheets (Menu Profit)"
+        }
+      }
+    },
+    {
+      "parameters": { "fieldToSplitOut": "ingredients" },
+      "id": "1a1f1a10-0001-4000-8000-000000000015",
+      "name": "Split Out: Ingredients",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [-160, -220]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": { "mode": "id", "value": "PLACEHOLDER_GOOGLE_SHEET_ID" },
+        "sheetName": { "mode": "name", "value": "Supplier Ingredients" },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "matchingColumns": ["name"]
+        },
+        "options": {}
+      },
+      "id": "1a1f1a10-0001-4000-8000-000000000016",
+      "name": "Sheets: Supplier Ingredients",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [80, -220],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PLACEHOLDER_CREDENTIAL_ID",
+          "name": "Google Sheets (Menu Profit)"
+        }
+      }
+    },
+    {
+      "parameters": { "fieldToSplitOut": "posSales" },
+      "id": "1a1f1a10-0001-4000-8000-000000000017",
+      "name": "Split Out: POS Sales",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [-160, -360]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": { "mode": "id", "value": "PLACEHOLDER_GOOGLE_SHEET_ID" },
+        "sheetName": { "mode": "name", "value": "POS Sales" },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "matchingColumns": ["name"]
+        },
+        "options": {}
+      },
+      "id": "1a1f1a10-0001-4000-8000-000000000018",
+      "name": "Sheets: POS Sales",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [80, -360],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "PLACEHOLDER_CREDENTIAL_ID",
+          "name": "Google Sheets (Menu Profit)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Validate Secret", "type": "main", "index": 0 }]]
+    },
+    "Validate Secret": {
+      "main": [
+        [{ "node": "Respond Accepted", "type": "main", "index": 0 }],
+        [{ "node": "Build Failure Payload", "type": "main", "index": 0 }]
+      ]
+    },
+    "Respond Accepted": {
+      "main": [[{ "node": "Parse Spreadsheet Files", "type": "main", "index": 0 }]]
+    },
+    "Parse Spreadsheet Files": {
+      "main": [
+        [{ "node": "Needs AI Extraction?", "type": "main", "index": 0 }],
+        [{ "node": "Build Failure Payload", "type": "main", "index": 0 }]
+      ]
+    },
+    "Needs AI Extraction?": {
+      "main": [
+        [{ "node": "Claude: Extract Document Data", "type": "main", "index": 0 }],
+        [{ "node": "No AI Needed", "type": "main", "index": 0 }]
+      ]
+    },
+    "Claude: Extract Document Data": {
+      "main": [
+        [{ "node": "Parse Claude Response", "type": "main", "index": 0 }],
+        [{ "node": "Build Failure Payload", "type": "main", "index": 0 }]
+      ]
+    },
+    "Parse Claude Response": {
+      "main": [
+        [{ "node": "Merge Extraction Results", "type": "main", "index": 0 }],
+        [{ "node": "Build Failure Payload", "type": "main", "index": 0 }]
+      ]
+    },
+    "No AI Needed": {
+      "main": [[{ "node": "Merge Extraction Results", "type": "main", "index": 0 }]]
+    },
+    "Merge Extraction Results": {
+      "main": [
+        [
+          { "node": "Match Ingredients & Sales", "type": "main", "index": 0 },
+          { "node": "Split Out: Menu Items", "type": "main", "index": 0 },
+          { "node": "Split Out: Ingredients", "type": "main", "index": 0 },
+          { "node": "Split Out: POS Sales", "type": "main", "index": 0 }
+        ],
+        [{ "node": "Build Failure Payload", "type": "main", "index": 0 }]
+      ]
+    },
+    "Split Out: Menu Items": {
+      "main": [[{ "node": "Sheets: Menu Items", "type": "main", "index": 0 }]]
+    },
+    "Sheets: Menu Items": {
+      "main": [[], [{ "node": "Build Failure Payload", "type": "main", "index": 0 }]]
+    },
+    "Split Out: Ingredients": {
+      "main": [[{ "node": "Sheets: Supplier Ingredients", "type": "main", "index": 0 }]]
+    },
+    "Sheets: Supplier Ingredients": {
+      "main": [[], [{ "node": "Build Failure Payload", "type": "main", "index": 0 }]]
+    },
+    "Split Out: POS Sales": {
+      "main": [[{ "node": "Sheets: POS Sales", "type": "main", "index": 0 }]]
+    },
+    "Sheets: POS Sales": {
+      "main": [[], [{ "node": "Build Failure Payload", "type": "main", "index": 0 }]]
+    },
+    "Match Ingredients & Sales": {
+      "main": [
+        [{ "node": "Calculate Profitability", "type": "main", "index": 0 }],
+        [{ "node": "Build Failure Payload", "type": "main", "index": 0 }]
+      ]
+    },
+    "Calculate Profitability": {
+      "main": [
+        [
+          { "node": "Sheets: Costing & Profit", "type": "main", "index": 0 },
+          { "node": "Sheets: Review Required", "type": "main", "index": 0 },
+          { "node": "Sheets: Audit Summary", "type": "main", "index": 0 },
+          { "node": "Generate Excel Report", "type": "main", "index": 0 }
+        ],
+        [{ "node": "Build Failure Payload", "type": "main", "index": 0 }]
+      ]
+    },
+    "Sheets: Costing & Profit": {
+      "main": [[], [{ "node": "Build Failure Payload", "type": "main", "index": 0 }]]
+    },
+    "Sheets: Review Required": {
+      "main": [[], [{ "node": "Build Failure Payload", "type": "main", "index": 0 }]]
+    },
+    "Sheets: Audit Summary": {
+      "main": [[], [{ "node": "Build Failure Payload", "type": "main", "index": 0 }]]
+    },
+    "Generate Excel Report": {
+      "main": [
+        [{ "node": "Send Completed Callback", "type": "main", "index": 0 }],
+        [{ "node": "Build Failure Payload", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Failure Payload": {
+      "main": [[{ "node": "Send Failed Callback", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}
