@@ -1,3 +1,9 @@
+> **Archived 2026-10-26.** This workflow belonged to the first prototype: it ran the financial
+> calculations inside n8n Code nodes and stored restaurant data in Google Sheets. Neither fits
+> the current architecture, where the backend owns the figures and all data is job-scoped and
+> temporary. Kept only as a reference for the Claude extraction prompts. The replacement
+> workflows are specified in `docs/N8N_WORKFLOWS.md` (MP-01/02/99) and not built yet.
+
 # n8n setup — Menu Profit Audit workflow
 
 `menu-profit-workflow.json` is the importable Phase 1 workflow. It cannot be created

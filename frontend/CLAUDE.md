@@ -9,7 +9,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Data: `@tanstack/react-query` (REST API), `@tanstack/react-table` **v9** — a different API from the
   classic `useReactTable`/`flexRender` v8 one. See `node_modules/@tanstack/table-core/skills/` before touching tables.
 - Forms: `react-hook-form` + `zod`. shadcn's `Form` wrapper is an empty stub in this style — don't try to add it.
-- Charts: `recharts` via `components/ui/chart.tsx`. Toasts: `sonner`. Icons: `lucide-react`.
+- Charts: `recharts` via `components/ui/chart.tsx` (unused until the Release 2 dashboard).
+  Toasts: `sonner`. Icons: `lucide-react`. Tests: Vitest (`*.test.ts`).
 - Package manager: pnpm (pinned via `packageManager` in `package.json`).
 
 ## This is not the Next.js you trained on
@@ -20,26 +21,34 @@ read the matching guide in `node_modules/next/dist/docs/01-app/`.
 - **Cache Components are on** (`cacheComponents: true`): every route must produce a static shell. Uncached
   async work needs `'use cache'` or a `<Suspense>` boundary — otherwise the build fails; it does not silently
   fall back to full SSR.
-- **`proxy.ts`, not `middleware.ts`** — the root `proxy.ts` is the Next 16 convention; the exported function
-  is named `proxy`, and its runtime is always `nodejs`.
+- **`proxy.ts`, not `middleware.ts`** — if this app ever needs request-level middleware, the root
+  `proxy.ts` is the Next 16 convention (exported function named `proxy`, always the nodejs runtime).
+  There is none today: with no accounts there is nothing to gate.
 - Turbopack is the default bundler; its config lives at the top-level `turbopack` key, not `experimental`.
 - `params`/`searchParams`/`cookies()`/`headers()` are async-only; use the generated `PageProps`/`LayoutProps` helpers.
 - `next lint` is removed — linting is plain ESLint (`eslint.config.mjs`), run via `pnpm lint`.
 
 ## Commands
 
-`pnpm dev` / `pnpm build` / `pnpm start` / `pnpm lint`. No test runner is configured yet.
+`pnpm dev` / `pnpm build` / `pnpm start` / `pnpm lint` / `pnpm test` (Vitest).
+
+This app is the **frontend only**: it holds no business logic and no secrets. The NestJS API in
+`../backend` owns job state, validation, financial calculations and exports; this app talks to it
+through `lib/api/client.ts` and nothing else. `NEXT_PUBLIC_API_URL` is its only environment variable.
 
 ## Folder conventions
 
-- `app/(auth)/` — unauthenticated routes, centered shell, no sidebar. `app/(dashboard)/` — authenticated
-  shell (sidebar + header via `components/ui/sidebar`). Route groups don't add URL segments, so
-  `(dashboard)/page.tsx` is `/`.
+- `app/(app)/` — every screen, in a plain centered shell. Route groups don't add URL segments, so
+  `(app)/page.tsx` is `/` (upload) and `(app)/analysis/[jobId]` is the analysis workspace.
+  There are no auth routes: the product has no accounts, and a job's access token travels in the
+  link fragment (see `lib/api/job-session.ts`).
 - `components/ui/` — shadcn primitives, added with `pnpm dlx shadcn@latest add <name>`. Don't hand-edit them
   for styling — change the CSS tokens instead.
-- `components/<feature>/` — one folder per feature area (`dashboard/`, `auth/`), not per route.
-- `lib/` — `utils.ts` (`cn()`), `query-client.ts`, `api.ts` (fetch wrapper reading `API_BASE_URL` /
-  `NEXT_PUBLIC_API_URL`).
+- `components/<feature>/` — one folder per feature area (`audit/` for upload, `analysis/` for the
+  analysis workspace), not per route.
+- `lib/api/` — `client.ts` (the only module that talks to the backend), `types.ts` (API shapes),
+  `job-session.ts` (access token in the link fragment + localStorage). `lib/` also has `utils.ts`
+  (`cn()`), `query-client.ts`, `format.ts` (display formatting) and `audit/slots.ts` (upload slots).
 - No `src/` directory — everything lives at the repo root to match `components.json`'s aliases.
 
 ## Design tokens
