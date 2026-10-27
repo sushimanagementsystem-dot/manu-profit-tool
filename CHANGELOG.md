@@ -5,6 +5,20 @@ All notable changes to this repository. Frontend-internal history before 2026-10
 
 ## [Unreleased]
 
+### 2026-10-27 — MP-01 deployed; PDF extraction works end to end
+- **Deployed:** MP-01 is published on the n8n host, authenticated entirely through n8n's own
+  credential store. A real PDF supplier invoice now goes upload → dispatch → signed file URL →
+  Claude → signed callback → ingest → READY, with the backend reachable through a Cloudflare
+  quick tunnel. Closes KI-13 for PDFs; photos use the same path but are untried.
+- **Fixed:** three things that only a real host could show — a JSON schema the API rejects
+  (a nullable type carrying an enum), a pack stated in its own column being ignored (buns would
+  have costed 12× too high), and binary read from the wrong place on a host that stores it on
+  disk, which sent every PDF as empty base64.
+- **Changed:** the backend logs n8n's side of a failed extraction. The restaurant still sees
+  "The AI extraction service could not read this file"; whoever runs it now sees why.
+- **Verified by hand:** beef at €0.003/g from a 6 × 2.5kg case, buns at €0.30 from "dozen",
+  the delivery charge excluded, the date read as DD/MM.
+
 ### 2026-10-27 — MP-01 extraction workflow written
 - **Added:** `n8n/workflows/MP-01.json` — webhook → verify signature → respond → download file →
   Claude → signed callback. It answers the webhook before calling Claude, because the backend's
