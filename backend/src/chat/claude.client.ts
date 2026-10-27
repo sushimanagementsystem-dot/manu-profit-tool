@@ -53,10 +53,23 @@ export class ClaudeClient {
       if (response.stop_reason === 'refusal') {
         throw Problems.aiUnavailable('The assistant could not answer that request. Try rephrasing it.');
       }
+      this.logUsage(response.usage);
       return response;
     } catch (error) {
       throw this.translate(error);
     }
+  }
+
+  /**
+   * Token counts for every call, so the cost per audit is measured rather than guessed —
+   * the budget in docs/BUDGET_AND_SCOPE.md rests on it. Counts only; no message content.
+   */
+  private logUsage(usage: ChatResponse['usage']): void {
+    this.logger.log(
+      `model=${this.config.CHAT_MODEL} effort=${this.config.CHAT_EFFORT} ` +
+        `in=${usage.input_tokens} out=${usage.output_tokens} ` +
+        `cache_write=${usage.cache_creation_input_tokens ?? 0} cache_read=${usage.cache_read_input_tokens ?? 0}`,
+    );
   }
 
   private translate(error: unknown): unknown {
