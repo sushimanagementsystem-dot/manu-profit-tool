@@ -5,6 +5,21 @@ All notable changes to this repository. Frontend-internal history before 2026-10
 
 ## [Unreleased]
 
+### 2026-10-27 — MP-01 extraction workflow written
+- **Added:** `n8n/workflows/MP-01.json` — webhook → verify signature → respond → download file →
+  Claude → signed callback. It answers the webhook before calling Claude, because the backend's
+  dispatch gives up after 15 s while an extraction takes minutes. Claude is asked for the result
+  through `output_config.format` with a JSON schema generated from the backend's own Zod schemas,
+  so the shape cannot drift silently.
+- **Added:** `n8n/check-mp-01.mjs`, which runs the workflow's three Code nodes outside n8n (22 checks:
+  signature accepted, tampered body / wrong key / stale timestamp rejected, request shape, and a
+  callback signature the backend's own verification accepts), and `n8n/fixtures/` + a backend contract
+  test over them (`extraction.contract.spec.ts`). Backend tests 46 → 51.
+- **Corrected (docs):** N8N_WORKFLOWS.md said the shared secrets would live in n8n credentials. A Code
+  node cannot read one, and the HMAC is per request body, so they are host env vars instead.
+- **Not done:** MP-01 has never run on a real n8n host or against a real document, and MP-99 does not
+  exist. MP-02 is not needed for Release 1.
+
 ### 2026-10-27 — Assistant verified, results table, UI test pass
 - **Verified:** the assistant now runs against the real model (`ANTHROPIC_API_KEY` set, `/health` reports
   `assistant: true`). The whole flow was driven through the browser with Playwright: upload → audit →

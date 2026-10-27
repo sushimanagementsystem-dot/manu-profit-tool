@@ -1,0 +1,50 @@
+{
+  "invoices": [
+    {
+      "supplierName": "Metro Foods",
+      "invoiceNumber": "INV-1001",
+      "invoiceDate": "2026-09-05",
+      "currency": "EUR",
+      "totals": { "net": "224.00", "vat": "0.00", "gross": "224.00" },
+      "lines": [
+        {
+          "description": "Beef Mince 6 x 2.5kg",
+          "quantity": "2",
+          "packCount": "6",
+          "packSize": "2.5",
+          "packUnit": "kg",
+          "unitPrice": "45.00",
+          "lineNet": "90.00",
+          "vatRate": "0",
+          "sourceRef": "p1 line 3",
+          "modelConfidence": "high"
+        },
+        {
+          "description": "Potatoes 25kg",
+          "quantity": "4",
+          "packCount": null,
+          "packSize": "25",
+          "packUnit": "kg",
+          "unitPrice": "12.50",
+          "lineNet": "50.00",
+          "vatRate": "0",
+          "sourceRef": "p1 line 6",
+          "modelConfidence": "high"
+        },
+        {
+          "description": "Assorted garnish",
+          "quantity": null,
+          "packCount": null,
+          "packSize": null,
+          "packUnit": null,
+          "unitPrice": null,
+          "lineNet": "8.40",
+          "vatRate": null,
+          "sourceRef": "p1 line 9",
+          "modelConfidence": "low"
+        }
+      ]
+    }
+  ],
+  "warnings": ["Line 9 was partly obscured by a stamp; only the line total was legible."]
+}

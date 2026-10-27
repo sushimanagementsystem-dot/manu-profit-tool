@@ -1,0 +1,9 @@
+{
+  "periodStart": "2026-09-01",
+  "periodEnd": "2026-09-30",
+  "rows": [
+    { "itemName": "CLASSIC BURGER", "category": "Mains", "quantity": "320", "netRevenue": "3680.00", "grossRevenue": null, "date": null, "sourceRef": "p1 row 4" },
+    { "itemName": "CRAFT LAGER", "category": "Drinks", "quantity": "500", "netRevenue": "2400.00", "grossRevenue": null, "date": null, "sourceRef": "p1 row 8" }
+  ],
+  "warnings": []
+}

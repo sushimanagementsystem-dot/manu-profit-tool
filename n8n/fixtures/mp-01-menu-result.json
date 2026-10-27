@@ -1,0 +1,9 @@
+{
+  "items": [
+    { "name": "Classic Burger", "category": "Mains", "description": "6oz beef, cheddar, brioche bun", "price": "14.50", "sourceRef": "p1 Mains" },
+    { "name": "Craft Lager (pint)", "category": "Drinks", "description": null, "price": "6.00", "sourceRef": "p2 Drinks" },
+    { "name": "Craft Lager (half)", "category": "Drinks", "description": null, "price": "3.40", "sourceRef": "p2 Drinks" },
+    { "name": "Soup of the Day", "category": "Starters", "description": "Ask your server", "price": null, "sourceRef": "p1 Starters" }
+  ],
+  "warnings": ["The price for Soup of the Day is not printed on the menu."]
+}

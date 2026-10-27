@@ -1,8 +1,13 @@
 # n8n Workflow Architecture — Menu Profit
 
-Status: **PLANNED. No workflows have been created or deployed.** The old `frontend/n8n/menu-profit-workflow.json`
-(Google Sheets based, with financial math in Code nodes) is **not reused**. It stays in the repo until MP-01 has
-replaced it end to end, and is then archived with approval (see Phase 9).
+Status (2026-10-27): **MP-01 is built but not yet deployed** — `n8n/workflows/MP-01.json`, with setup
+instructions in `n8n/README.md`. It has not run against a real document on a real n8n host. MP-02 and MP-99
+are still PLANNED; MP-02 is **not** needed for Release 1, because the backend does column detection, matching
+and recommendations itself and nothing calls `N8N_ASSIST_PATH`.
+
+The old `frontend/n8n/menu-profit-workflow.json` (Google Sheets based, with financial math in Code nodes) is
+**not reused**; it was archived to `docs/archive/legacy-n8n/` on 2026-10-26. It still needs deactivating on the
+n8n host, its Google Sheet data deleting, and its secrets rotating.
 
 ## Design rules
 1. **NestJS owns state.** Every n8n execution handles **one task** (one file, or one assist request). It gets
@@ -151,8 +156,9 @@ brief allows.)
 | `EXECUTIONS_DATA_SAVE_ON_ERROR` | `all` | Debugging |
 | `EXECUTIONS_DATA_PRUNE` / `EXECUTIONS_DATA_MAX_AGE` | `true` / `48` (hours) | Matches the retention policy |
 | `NODE_FUNCTION_ALLOW_BUILTIN` | `crypto` | HMAC in Code nodes |
-| `N8N_BLOCK_ENV_ACCESS_IN_NODE` | keep the default; secrets live in credentials | |
-| Credentials | `MP Anthropic` (header `x-api-key` + `anthropic-version`), `MP Inbound Key` (header auth), `MP Callback Secret` (used by Code node) | A separate Anthropic key for n8n, for spend tracking |
+| `N8N_BLOCK_ENV_ACCESS_IN_NODE` | `false` | **Corrected 2026-10-27.** This originally said secrets would live in credentials. They cannot: a Code node can read an n8n credential only through an HTTP node, and the HMAC has to be computed over each request body inside a Code node. The three shared secrets are therefore host env vars — see `n8n/README.md` |
+| `MP_INBOUND_KEY`, `MP_REQUEST_SECRET`, `MP_CALLBACK_SECRET` | the backend's matching values | Read by the Verify Signature and Build Callback Code nodes |
+| Credentials | `MP Anthropic` (header `x-api-key`; `anthropic-version` is sent as a plain header by the node) | A separate Anthropic key for n8n, for spend tracking |
 | Webhook URLs | Production URLs only (`/webhook/…`, not `/webhook-test/…`) | `.env.example` currently points at a test URL |
 
 Verify the env-var names against the installed n8n version before applying them.
