@@ -64,6 +64,21 @@ After importing, open the **Call Claude** node and select it.
 Import `workflows/MP-01.json`, pick the credential, then activate it. Take the **production**
 webhook URL (`/webhook/mp-extract`, not `/webhook-test/...`).
 
+**n8n does not import workflow settings** — only nodes and connections come across, and on
+import it may also auto-select whatever credential it finds first. After importing, open
+*… → Settings* and set **Save successful production executions** to *Do not save* by hand
+(a successful run holds a client's invoice data), leaving failed executions saved for
+debugging. Then open **Call Claude** and check the credential is the Anthropic one.
+
+Imported on this project's host on 2026-10-27 as workflow `IvglOP8WdqrosQcp`, with its
+settings and the `MP Anthropic` credential (restricted to `api.anthropic.com`) set up.
+Left **unpublished**: the API key and the three host env vars are still missing, and an
+active webhook without them would reject every request. Its production URL is
+`https://bo4jn8291nlzdnfuvf6noywk.13.140.165.6.sslip.io/webhook/mp-extract`.
+
+That host has no `$vars` (Variables are an Enterprise feature there), so the secrets below
+have to be real environment variables on the host — there is no in-app fallback.
+
 ### 4. Point the backend at it
 
 In `backend/.env`:
