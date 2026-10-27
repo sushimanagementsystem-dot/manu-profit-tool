@@ -113,7 +113,20 @@ PUBLIC_API_BASE_URL=<a URL n8n can actually reach>
 
 `PUBLIC_API_BASE_URL` is the catch. The backend builds both the file download URL and the
 callback URL from it, and n8n has to reach both — so `http://localhost:4000` only works if n8n
-runs on the same machine. Otherwise expose the backend with a tunnel and put that URL here.
+runs on the same machine. Otherwise expose the backend with a tunnel and put that URL here:
+
+```
+cloudflared tunnel --url http://localhost:4000
+```
+
+A quick tunnel needs no Cloudflare account, but **its hostname changes every time it starts**.
+Each restart means a new `PUBLIC_API_BASE_URL` and another backend restart — and any analysis
+still mid-extraction when the old tunnel died will fail, because n8n can no longer reach the
+file URL it was given. For anything beyond testing, deploy the backend instead.
+
+While a tunnel is up the whole API is reachable from the internet. What protects it: each
+analysis needs its own bearer token, the file URLs are signed, short-lived and only valid
+while their task is dispatched, and callbacks need the shared key.
 
 Restart the backend afterwards: `.env` is read once at startup, and a rebuild alone does not
 re-read it.
