@@ -158,5 +158,37 @@ try {
   ok('callback body shape', false, e.message);
 }
 
+
+// 6. Optional live check: the JSON schema is validated by the API, not by anything above.
+// A nullable type carrying an enum passes every offline check here and is rejected with a 400
+// at request time, which is how MP-01 first failed on a real document. Run with --live and
+// ANTHROPIC_API_KEY set; it asks for one token, so it costs almost nothing.
+if (process.argv.includes('--live')) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    ok('live schema check', false, 'ANTHROPIC_API_KEY is not set');
+  } else {
+    for (const category of ['MENU', 'POS', 'INVOICE']) {
+      const request = runNode('Build Claude Request', {
+        inputItems: [{ json: {} }],
+        nodeOutputs: {
+          'Read Task': { json: { ...task, file: { ...task.file, category } } },
+          'Download File': { binary: { data: { data: 'JVBERi0xLjQK' } } },
+        },
+      })[0].json.request;
+
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({ ...request, max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] }),
+      });
+      // 400 means the schema itself was rejected; any other status means it was accepted and
+      // generation then ran into the one-token ceiling, which is what we asked for.
+      const detail = response.status === 400 ? (await response.json())?.error?.message : '';
+      ok(`${category} schema is accepted by the API`, response.status !== 400, detail);
+    }
+  }
+}
+
 console.log(failures === 0 ? '\nAll checks passed.' : `\n${failures} check(s) failed.`);
 process.exit(failures === 0 ? 0 : 1);

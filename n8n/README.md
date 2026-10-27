@@ -134,9 +134,15 @@ re-read it.
 ### 5. Check it
 
 ```
-node n8n/check-mp-01.mjs     # the Code nodes, without n8n
-cd backend && pnpm test      # the contract the fixtures describe
+node n8n/check-mp-01.mjs            # the Code nodes, without n8n
+node n8n/check-mp-01.mjs --live     # also asks the API to validate the JSON schemas
+cd backend && pnpm test             # the contract the fixtures describe
 ```
+
+Run `--live` after touching the schemas (it needs `ANTHROPIC_API_KEY` and costs a token or
+two). The offline checks compare the schema with the backend's Zod, which cannot see what the
+API's own validator will reject — a nullable type carrying an enum passes every offline check
+and 400s at request time, which is exactly how MP-01 failed on its first real document.
 
 Then upload a real PDF invoice through the app. `/health` still reports
 `aiExtraction: false` until `N8N_BASE_URL` and `N8N_INBOUND_KEY` are both set.
