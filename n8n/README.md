@@ -90,11 +90,10 @@ Three things the import does **not** do, each of which has bitten this workflow 
 - **It auto-selects whatever credential it finds first**, including an unrelated one from
   another workflow. Check all three nodes after importing.
 
-Imported on this project's host on 2026-10-27 as workflow `IvglOP8WdqrosQcp`, with its
-settings and the `MP Anthropic` credential (restricted to `api.anthropic.com`) set up.
-Left **unpublished**: the API key and the three host env vars are still missing, and an
-active webhook without them would reject every request. Its production URL is
-`https://bo4jn8291nlzdnfuvf6noywk.13.140.165.6.sslip.io/webhook/mp-extract`.
+This was deployed and published on the project's own n8n host on 2026-10-27, and a real PDF
+invoice and a photographed menu both ran through it. The host and workflow id are deployment
+details and are deliberately not written down here — take the production URL from the Webhook
+node and put it in `backend/.env` as described below.
 
 That host has no `$vars` — Variables are an Enterprise feature there — which is why the
 secrets live in credentials rather than in expressions.
