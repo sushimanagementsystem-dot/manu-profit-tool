@@ -18,7 +18,7 @@
 | ID | Issue | Impact | Status / fix | Done |
 |---|---|---|---|---|
 | KI-12 | ~~The AI assistant has never run against the real model~~ | — | **Resolved 2026-10-27**: the key is set, `/health` reports `assistant: true`, and the chat was driven end to end through the UI — a question, a recipe + VAT correction, Apply, and a multi-turn follow-up. Figures hand-checked (see PROGRESS.md). | ✅ |
-| KI-13 | ~~PDF and photo uploads fail during extraction~~ | — | **Resolved 2026-10-27**: MP-01 is deployed and published on the n8n host, and a real PDF invoice went upload → dispatch → Claude → callback → ingest → READY. Photos use the same path but have not been tried. | ✅ |
+| KI-13 | ~~PDF and photo uploads fail during extraction~~ | — | **Resolved 2026-10-27**: MP-01 is deployed and published on the n8n host. A real PDF invoice and a photographed menu both went upload → dispatch → Claude → callback → ingest → READY, each on the first attempt. Rebuild either document from `n8n/fixtures/samples/`. | ✅ |
 | KI-14 | No integration tests against `menu_profit_test`, and only one mock dataset. | Regressions in routing, guards and cascade deletes would not be caught. | Phase 10; datasets DS-2…DS-10 in TESTING_STRATEGY.md. | ⬜ |
 | KI-15 | `AnalysisJob.idempotencyKey` exists in the schema but nothing sets it. | Dead column; a retried `POST /jobs` creates a second job. | Either wire up the `Idempotency-Key` header or drop the column in the next migration. | ⬜ |
 

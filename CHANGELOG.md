@@ -9,15 +9,21 @@ All notable changes to this repository. Frontend-internal history before 2026-10
 - **Deployed:** MP-01 is published on the n8n host, authenticated entirely through n8n's own
   credential store. A real PDF supplier invoice now goes upload → dispatch → signed file URL →
   Claude → signed callback → ingest → READY, with the backend reachable through a Cloudflare
-  quick tunnel. Closes KI-13 for PDFs; photos use the same path but are untried.
+  quick tunnel. A photographed menu does too — tilted, soft and unevenly lit, read first time, with
+  section headings kept as categories and a priceless dish left priceless. Closes KI-13.
 - **Fixed:** three things that only a real host could show — a JSON schema the API rejects
   (a nullable type carrying an enum), a pack stated in its own column being ignored (buns would
   have costed 12× too high), and binary read from the wrong place on a host that stores it on
   disk, which sent every PDF as empty base64.
 - **Changed:** the backend logs n8n's side of a failed extraction. The restaurant still sees
   "The AI extraction service could not read this file"; whoever runs it now sees why.
-- **Verified by hand:** beef at €0.003/g from a 6 × 2.5kg case, buns at €0.30 from "dozen",
-  the delivery charge excluded, the date read as DD/MM.
+- **Verified by hand:** beef at €0.003/g from a 6 × 2.5kg case, buns at €0.30 from "dozen", the
+  delivery charge excluded, the date read as DD/MM, and every menu price net of the right VAT rate
+  (23% on the lagers, 13.5% on the food).
+- **Added:** `n8n/fixtures/samples/` — generators for both documents, each shaped around a mistake
+  that was actually made, so rerunning them catches it coming back.
+- **Measured:** extracting one PDF invoice and one menu photo cost about $0.07 on Opus 5.5
+  (7,374 input + 2,167 output tokens), now recorded per job in `AnalysisJob.aiUsage`.
 
 ### 2026-10-27 — MP-01 extraction workflow written
 - **Added:** `n8n/workflows/MP-01.json` — webhook → verify signature → respond → download file →

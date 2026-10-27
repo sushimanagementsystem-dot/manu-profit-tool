@@ -1,0 +1,3 @@
+# The generators are the source of truth; the documents they make are rebuilt on demand.
+*.pdf
+*.jpg
