@@ -34,6 +34,12 @@ export const envSchema = z.object({
 
   N8N_REQUEST_SECRET: secret,
   N8N_CALLBACK_SECRET: secret,
+  /**
+   * Alternative callback authentication for an n8n host where a Code node cannot reach a
+   * secret — n8n sends this as a header from one of its own encrypted credentials instead of
+   * signing the body. See n8n/README.md for what that trades away.
+   */
+  N8N_CALLBACK_KEY: optionalString,
   N8N_FILE_URL_SECRET: secret,
   DOWNLOAD_TOKEN_SECRET: secret,
 });

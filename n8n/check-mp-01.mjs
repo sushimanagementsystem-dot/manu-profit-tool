@@ -25,11 +25,7 @@ for (const [name, js] of Object.entries(code)) {
   }
 }
 
-// 2. Run "Verify Signature" against a payload signed the way the backend signs it.
-const REQUEST_SECRET = 'request-secret-for-the-test';
-const INBOUND_KEY = 'inbound-key-for-the-test';
-const CALLBACK_SECRET = 'callback-secret-for-the-test';
-
+// 2. Read Task — the Webhook node authenticates, so this only parses and guards the shape.
 const task = {
   schemaVersion: '1',
   jobId: '11111111-1111-4111-8111-111111111111',
@@ -46,24 +42,14 @@ const task = {
   model: 'claude-opus-5-5',
   callbackUrl: 'http://localhost:4000/api/v1/internal/n8n/callbacks',
 };
-const body = JSON.stringify(task);
-const stamp = Math.floor(Date.now() / 1000).toString();
-const backendSig = 'sha256=' + crypto.createHmac('sha256', REQUEST_SECRET).update(`${stamp}.${body}`).digest('hex');
 
-function runNode(name, { inputItems, env, nodeOutputs = {} }) {
+function runNode(name, { inputItems, env = {}, nodeOutputs = {} }) {
   const context = {
     require: (m) => {
       if (m === 'crypto') return crypto;
       throw new Error(`blocked require: ${m}`);
     },
-    Buffer,
-    Date,
-    Number,
-    JSON,
-    String,
-    Array,
-    Error,
-    console,
+    Buffer, Date, Number, JSON, String, Array, Error, console,
     $env: env,
     $execution: { id: 'exec-123' },
     $input: { first: () => inputItems[0] },
@@ -72,45 +58,37 @@ function runNode(name, { inputItems, env, nodeOutputs = {} }) {
       return { first: () => nodeOutputs[nodeName] };
     },
   };
-  const script = new vm.Script(`(function () {\n${code[name]}\n})()`);
-  return script.runInNewContext(context, { timeout: 5000 });
+  return new vm.Script(`(function () {
+${code[name]}
+})()`).runInNewContext(context, { timeout: 5000 });
 }
+
+const asWebhookItem = (body) => ({
+  json: { headers: {} },
+  binary: { data: { data: Buffer.from(JSON.stringify(body), 'utf8').toString('base64') } },
+});
 
 try {
-  const out = runNode('Verify Signature', {
-    inputItems: [{
-      json: {
-        headers: { 'x-mp-key': INBOUND_KEY, 'x-mp-timestamp': stamp, 'x-mp-signature': backendSig },
-      },
-      binary: { data: { data: Buffer.from(body, 'utf8').toString('base64') } },
-    }],
-    env: { MP_INBOUND_KEY: INBOUND_KEY, MP_REQUEST_SECRET: REQUEST_SECRET },
-  });
-  ok('Verify Signature accepts a correctly signed request', out[0].json.taskId === task.taskId);
+  const out = runNode('Read Task', { inputItems: [asWebhookItem(task)] });
+  ok('Read Task reads the body the backend sent', out[0].json.taskId === task.taskId);
 } catch (e) {
-  ok('Verify Signature accepts a correctly signed request', false, e.message);
+  ok('Read Task reads the body the backend sent', false, e.message);
 }
 
-for (const [label, mutate] of [
-  ['a tampered body', (h, b) => [h, b.replace('EUR', 'USD')]],
-  ['a wrong signature', (h, b) => [{ ...h, 'x-mp-signature': 'sha256=' + '0'.repeat(64) }, b]],
-  ['a wrong inbound key', (h, b) => [{ ...h, 'x-mp-key': 'nope' }, b]],
-  ['an old timestamp', (h, b) => [{ ...h, 'x-mp-timestamp': String(Number(h['x-mp-timestamp']) - 600) }, b]],
+ok('Read Task holds no secret', !code['Read Task'].includes('$env') && !code['Read Task'].includes('createHmac'));
+
+for (const [label, body] of [
+  ['an unsupported schemaVersion', { ...task, schemaVersion: '2' }],
+  ['a task with no callbackUrl', { ...task, callbackUrl: undefined }],
+  ['a task with no download URL', { ...task, file: { ...task.file, downloadUrl: undefined } }],
 ]) {
-  const [headers, mutatedBody] = mutate(
-    { 'x-mp-key': INBOUND_KEY, 'x-mp-timestamp': stamp, 'x-mp-signature': backendSig },
-    body,
-  );
   let rejected = false;
   try {
-    runNode('Verify Signature', {
-      inputItems: [{ json: { headers }, binary: { data: { data: Buffer.from(mutatedBody, 'utf8').toString('base64') } } }],
-      env: { MP_INBOUND_KEY: INBOUND_KEY, MP_REQUEST_SECRET: REQUEST_SECRET },
-    });
+    runNode('Read Task', { inputItems: [asWebhookItem(body)] });
   } catch {
     rejected = true;
   }
-  ok(`Verify Signature rejects ${label}`, rejected);
+  ok(`Read Task rejects ${label}`, rejected);
 }
 
 // 3. Build Claude Request — shape of the API call.
@@ -118,9 +96,8 @@ let built;
 try {
   built = runNode('Build Claude Request', {
     inputItems: [{ json: {} }],
-    env: {},
     nodeOutputs: {
-      'Verify Signature': { json: task },
+      'Read Task': { json: task },
       'Download File': { binary: { data: { data: 'JVBERi0xLjQK' } } },
     },
   })[0].json;
@@ -136,13 +113,8 @@ try {
   ok('Build Claude Request runs', false, e.message);
 }
 
-// 4. Build Callback — signature must verify the way the backend verifies it.
-function backendVerifies(timestamp, rawBody, signature) {
-  const expected = 'sha256=' + crypto.createHmac('sha256', CALLBACK_SECRET).update(`${timestamp}.${rawBody}`).digest('hex');
-  const a = Buffer.from(signature);
-  const b = Buffer.from(expected);
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
-}
+// 4. Build Callback — status logic, and no secret anywhere in it.
+ok('Build Callback holds no secret', !code['Build Callback'].includes('$env') && !code['Build Callback'].includes('createHmac'));
 
 const claudeOk = {
   model: 'claude-opus-5-5',
@@ -164,13 +136,9 @@ for (const [label, response, expectedStatus] of [
   try {
     const out = runNode('Build Callback', {
       inputItems: [{ json: response }],
-      env: { MP_CALLBACK_SECRET: CALLBACK_SECRET },
       nodeOutputs: { 'Build Claude Request': { json: built } },
     })[0].json;
-    const parsed = JSON.parse(out.body);
-    const signed = backendVerifies(out.timestamp, out.body, out.signature);
-    ok(`Build Callback reports ${label} as ${expectedStatus}`, parsed.status === expectedStatus && signed,
-      signed ? '' : 'signature would not verify');
+    ok(`Build Callback reports ${label} as ${expectedStatus}`, JSON.parse(out.body).status === expectedStatus);
   } catch (e) {
     ok(`Build Callback handles ${label}`, false, e.message);
   }
@@ -180,7 +148,6 @@ for (const [label, response, expectedStatus] of [
 try {
   const out = runNode('Build Callback', {
     inputItems: [{ json: claudeOk }],
-    env: { MP_CALLBACK_SECRET: CALLBACK_SECRET },
     nodeOutputs: { 'Build Claude Request': { json: built } },
   })[0].json;
   const parsed = JSON.parse(out.body);

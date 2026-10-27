@@ -27,23 +27,35 @@ It answers the webhook before calling Claude, because the backend's dispatch giv
 
 ## Setting it up
 
-### 1. Host environment
+### 1. Credentials — three values you paste, nothing on the host
 
-The Code nodes compute HMACs, and a Code node cannot read an n8n credential — so these three
-must be environment variables on the n8n host, and env access must be open to Code nodes:
+Everything secret lives in n8n's own encrypted credential store. No host environment
+variables, and nothing secret in the workflow or in Git.
 
-| Variable | Set it to |
-|---|---|
-| `N8N_BLOCK_ENV_ACCESS_IN_NODE` | `false` |
-| `MP_INBOUND_KEY` | the backend's `N8N_INBOUND_KEY` |
-| `MP_REQUEST_SECRET` | the backend's `N8N_REQUEST_SECRET` |
-| `MP_CALLBACK_SECRET` | the backend's `N8N_CALLBACK_SECRET` |
+| Credential | Type | Header name | Value — copy from |
+|---|---|---|---|
+| `MP Inbound Key` | Header Auth | `x-mp-key` | `backend/.env` → `N8N_INBOUND_KEY` |
+| `MP Anthropic` | Header Auth | `x-api-key` | your Anthropic API key, created for n8n alone |
+| `MP Callback Key` | Header Auth | `x-mp-callback-key` | `backend/.env` → `N8N_CALLBACK_KEY` |
 
-This is a deliberate departure from `docs/N8N_WORKFLOWS.md`, which said secrets would live in
-credentials. They cannot: credentials are readable by HTTP nodes, not by Code nodes, and the
-signature has to be computed per request body.
+Set **Allowed HTTP Request Domains** on each to the one host it may talk to —
+`api.anthropic.com` for the Anthropic one, your backend's host for the callback one. That way
+a misconfigured node cannot leak a key somewhere else.
 
-Retention settings, which matter because a successful run holds a client's invoice data:
+**What this trades away.** An earlier design had the Code nodes compute an HMAC over each
+body, which also proves the body was not altered in flight. A Code node cannot read an n8n
+credential, so that needed the secrets as host environment variables with
+`N8N_BLOCK_ENV_ACCESS_IN_NODE=false` — and on a host without that access the only alternative
+was writing them into the workflow, where they would reach Git. A shared key in the credential
+store is the better trade: the transport is HTTPS, the backend re-validates every result
+against its schema, and a callback is only acted on while its task is `DISPATCHED` on the same
+attempt, so a replayed one does nothing. The backend still accepts signed callbacks, so a host
+that *can* set env vars can go back to HMAC by dropping `N8N_CALLBACK_KEY` and restoring the
+signing nodes.
+
+### 1b. Retention settings on the host
+
+Optional, but a successful run holds a client's invoice data:
 
 | Variable | Value |
 |---|---|
@@ -51,13 +63,14 @@ Retention settings, which matter because a successful run holds a client's invoi
 | `EXECUTIONS_DATA_SAVE_ON_ERROR` | `all` |
 | `EXECUTIONS_DATA_PRUNE` | `true` |
 | `EXECUTIONS_DATA_MAX_AGE` | `48` |
-| `NODE_FUNCTION_ALLOW_BUILTIN` | include `crypto` |
 
-### 2. Credential
+Without host access, set the same thing per workflow in *… → Settings* (see step 3) — that
+covers this workflow, which is what matters here.
 
-Create an HTTP Header Auth credential named **MP Anthropic**: header `x-api-key`, value an
-Anthropic API key created for n8n alone, so its spend is separate from the chat assistant's.
-After importing, open the **Call Claude** node and select it.
+### 2. Wire the credentials up
+
+After importing, open the **Webhook** node (Authentication → Header Auth → `MP Inbound Key`),
+the **Call Claude** node (→ `MP Anthropic`) and the **Send Callback** node (→ `MP Callback Key`).
 
 ### 3. Import and activate
 
@@ -76,8 +89,8 @@ Left **unpublished**: the API key and the three host env vars are still missing,
 active webhook without them would reject every request. Its production URL is
 `https://bo4jn8291nlzdnfuvf6noywk.13.140.165.6.sslip.io/webhook/mp-extract`.
 
-That host has no `$vars` (Variables are an Enterprise feature there), so the secrets below
-have to be real environment variables on the host — there is no in-app fallback.
+That host has no `$vars` — Variables are an Enterprise feature there — which is why the
+secrets live in credentials rather than in expressions.
 
 ### 4. Point the backend at it
 
@@ -86,7 +99,8 @@ In `backend/.env`:
 ```
 N8N_BASE_URL=https://your-n8n-host
 N8N_EXTRACT_PATH=/webhook/mp-extract
-N8N_INBOUND_KEY=<same value as MP_INBOUND_KEY>
+N8N_INBOUND_KEY=<the value in the MP Inbound Key credential>
+N8N_CALLBACK_KEY=<the value in the MP Callback Key credential>
 PUBLIC_API_BASE_URL=<a URL n8n can actually reach>
 ```
 
@@ -109,8 +123,9 @@ Then upload a real PDF invoice through the app. `/health` still reports
 
 ## The contract
 
-Backend → n8n, signed `sha256=HMAC(MP_REQUEST_SECRET, "<timestamp>.<raw body>")` in
-`x-mp-signature`, with `x-mp-key` and `x-mp-timestamp` (±5 minutes):
+Backend → n8n, authenticated by the `x-mp-key` header that the Webhook node's credential
+checks. The backend also sends `x-mp-timestamp` and an `x-mp-signature` HMAC, which this
+workflow does not verify — a Code node cannot read the secret it would need:
 
 ```json
 { "schemaVersion": "1", "jobId": "...", "taskId": "...", "attempt": 1,
@@ -119,7 +134,8 @@ Backend → n8n, signed `sha256=HMAC(MP_REQUEST_SECRET, "<timestamp>.<raw body>"
   "hints": { "currency": "EUR" }, "model": "claude-opus-5-5", "callbackUrl": "..." }
 ```
 
-n8n → backend, signed the same way with `MP_CALLBACK_SECRET`:
+n8n → backend, carrying `x-mp-callback-key` from its credential (or, on a host that can sign,
+`x-mp-signature` over `"<timestamp>.<raw body>"` with `N8N_CALLBACK_SECRET`):
 
 ```json
 { "schemaVersion": "1", "taskId": "...", "attempt": 1,

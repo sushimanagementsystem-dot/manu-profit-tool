@@ -3,7 +3,6 @@ import type { RawBodyRequest } from '@nestjs/common';
 import type { Request } from 'express';
 import { z } from 'zod';
 
-import { hmacHex, safeEqual } from '../common/crypto';
 import { Problems } from '../common/problem';
 import type { AppConfig } from '../config/env.schema';
 import { InjectConfig } from '../config/config.module';
@@ -16,9 +15,8 @@ import {
 } from '../extraction/extraction.schemas';
 import { ExtractionIngestService } from '../extraction/extraction-ingest.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { assertCallbackAuthentic } from './callback-auth';
 import { RetryableTaskError, TaskRunnerService, UnrecoverableTaskError } from './task-runner.service';
-
-const MAX_CLOCK_SKEW_SECONDS = 300;
 
 const callbackSchema = z.object({
   schemaVersion: z.string(),
@@ -59,10 +57,11 @@ export class N8nCallbackController {
     @Req() request: RawBodyRequest<Request>,
     @Headers('x-mp-timestamp') timestamp: string | undefined,
     @Headers('x-mp-signature') signature: string | undefined,
+    @Headers('x-mp-callback-key') callbackKey: string | undefined,
   ) {
     const rawBody = request.rawBody?.toString('utf8');
     if (!rawBody) throw Problems.badRequest('Missing request body.');
-    this.verifySignature(rawBody, timestamp, signature);
+    this.authenticate(rawBody, timestamp, signature, callbackKey);
 
     const body = callbackSchema.parse(JSON.parse(rawBody));
     if (body.schemaVersion !== EXTRACTION_SCHEMA_VERSION) {
@@ -107,12 +106,20 @@ export class N8nCallbackController {
     return { accepted: true };
   }
 
-  private verifySignature(rawBody: string, timestamp: string | undefined, signature: string | undefined): void {
-    const seconds = Number(timestamp);
-    if (!signature || !Number.isFinite(seconds)) throw Problems.unauthorized();
-    if (Math.abs(Date.now() / 1000 - seconds) > MAX_CLOCK_SKEW_SECONDS) throw Problems.unauthorized();
-    const expected = `sha256=${hmacHex(this.config.N8N_CALLBACK_SECRET, `${timestamp}.${rawBody}`)}`;
-    if (!safeEqual(signature, expected)) throw Problems.unauthorized();
+  private authenticate(
+    rawBody: string,
+    timestamp: string | undefined,
+    signature: string | undefined,
+    callbackKey: string | undefined,
+  ): void {
+    assertCallbackAuthentic(
+      rawBody,
+      { timestamp, signature, callbackKey },
+      {
+        callbackSecret: this.config.N8N_CALLBACK_SECRET,
+        callbackKey: this.config.N8N_CALLBACK_KEY,
+      },
+    );
   }
 
   private async recordUsage(jobId: string, usage: z.infer<typeof callbackSchema>['usage']): Promise<void> {
