@@ -77,11 +77,18 @@ the **Call Claude** node (→ `MP Anthropic`) and the **Send Callback** node (�
 Import `workflows/MP-01.json`, pick the credential, then activate it. Take the **production**
 webhook URL (`/webhook/mp-extract`, not `/webhook-test/...`).
 
-**n8n does not import workflow settings** — only nodes and connections come across, and on
-import it may also auto-select whatever credential it finds first. After importing, open
-*… → Settings* and set **Save successful production executions** to *Do not save* by hand
-(a successful run holds a client's invoice data), leaving failed executions saved for
-debugging. Then open **Call Claude** and check the credential is the Anthropic one.
+Three things the import does **not** do, each of which has bitten this workflow once:
+
+- **It appends rather than replaces.** Importing into a workflow that already has nodes leaves
+  both copies, and the new ones come in renamed (`Download File1`), which silently breaks the
+  Code nodes — they look each other up by name. Clear the canvas (Ctrl+A, Delete, save) before
+  re-importing, or import into a new workflow.
+- **It drops workflow settings.** Open *… → Settings* and set **Save successful production
+  executions** to *Do not save* by hand; a successful run holds a client's invoice data. Leave
+  failed executions saved — that is where debugging happens. These settings do survive a later
+  re-import, because they live on the workflow rather than on the nodes.
+- **It auto-selects whatever credential it finds first**, including an unrelated one from
+  another workflow. Check all three nodes after importing.
 
 Imported on this project's host on 2026-10-27 as workflow `IvglOP8WdqrosQcp`, with its
 settings and the `MP Anthropic` credential (restricted to `api.anthropic.com`) set up.
