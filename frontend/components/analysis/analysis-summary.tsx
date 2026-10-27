@@ -2,6 +2,7 @@
 
 import { AlertTriangle, Info, TriangleAlert } from "lucide-react";
 
+import { ItemsTable } from "@/components/analysis/items-table";
 import { Card, CardContent } from "@/components/ui/card";
 import type { ResultsResponse } from "@/lib/api/types";
 import { formatMoney, formatNumber, formatPercent } from "@/lib/format";
@@ -46,6 +47,8 @@ export function AnalysisSummary({ results }: { results: ResultsResponse }) {
           {summary.itemsCosted < summary.itemsTotal &&
             " Tell the assistant below what goes into the missing dishes to complete it."}
         </p>
+
+        <ItemsTable items={results.items} currency={currency} />
 
         {results.issues.length > 0 && (
           <ul className="flex flex-col gap-2 border-t pt-4">

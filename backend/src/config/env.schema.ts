@@ -24,6 +24,8 @@ export const envSchema = z.object({
 
   ANTHROPIC_API_KEY: optionalString,
   CHAT_MODEL: z.string().default('claude-opus-5-5'),
+  /** Cost/quality control for the chat model. Lower it while testing, not in production. */
+  CHAT_EFFORT: z.enum(['low', 'medium', 'high']).default('medium'),
 
   N8N_BASE_URL: optionalString,
   N8N_EXTRACT_PATH: z.string().default('/webhook/mp-extract'),

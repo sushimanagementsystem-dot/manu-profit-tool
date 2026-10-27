@@ -9,6 +9,7 @@ import type {
   Readiness,
   ResultsResponse,
   UploadedFile,
+  UploadLimits,
 } from "./types";
 
 const BASE_URL = (
@@ -136,6 +137,9 @@ export function uploadFile(
 }
 
 export const api = {
+  /** The upload rules without creating a job, so the slots can state them on page load. */
+  uploadLimits: () => request<UploadLimits>("/upload-limits"),
+
   createJob: () => request<CreatedJob>("/jobs", { method: "POST", body: {} }),
 
   deleteFile: (jobId: string, token: string, fileId: string) =>

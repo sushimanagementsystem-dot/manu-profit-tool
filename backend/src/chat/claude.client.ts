@@ -42,7 +42,7 @@ export class ClaudeClient {
         model: this.config.CHAT_MODEL,
         max_tokens: MAX_TOKENS,
         // Thinking is always on for this model family; effort is the cost/quality control.
-        output_config: { effort: 'medium' },
+        output_config: { effort: this.config.CHAT_EFFORT },
         betas: [FALLBACK_BETA],
         fallbacks: 'default',
         system: options.system,

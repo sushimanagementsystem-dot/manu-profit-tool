@@ -5,6 +5,23 @@ All notable changes to this repository. Frontend-internal history before 2026-10
 
 ## [Unreleased]
 
+### 2026-10-27 — Assistant verified, results table, UI test pass
+- **Verified:** the assistant now runs against the real model (`ANTHROPIC_API_KEY` set, `/health` reports
+  `assistant: true`). The whole flow was driven through the browser with Playwright: upload → audit →
+  results → a question, a recipe + VAT correction, Apply, a multi-turn follow-up → Excel download.
+  Every figure was hand-checked, including the split VAT rates (13.5% food, 23% drinks). Closes KI-12.
+- **Added (frontend):** a per-item table in the results card — units sold, net price, cost, GP per portion,
+  GP % and menu-engineering class, best sellers first, straight from the analysis rather than the assistant.
+  A figure that is not known stays an em dash, never a zero.
+- **Added:** `GET /upload-limits`, so the upload screen can state what each slot accepts on page load.
+  The slots previously read "Loading…" forever, because the limits only arrived with the draft job and
+  the draft job is deliberately not created until the first file. Closes KI-16.
+- **Added:** `CHAT_EFFORT` (low | medium | high, default medium) alongside `CHAT_MODEL`, so testing can
+  run on a cheaper model and effort without touching the production defaults.
+- **Opened:** KI-17 (the slot label if `/upload-limits` fails), KI-18 (`progress` still reads 99% once a
+  job is READY), KI-19 (menu prices treated as VAT-inclusive while POS "Net Sales" is treated as
+  VAT-exclusive — defensible, but worth confirming with the first real client).
+
 ### 2026-10-26 — Release 1 implementation (frontend + backend)
 - **Added (backend):** the Menu Profit API on NestJS 11 + Prisma 7 + PostgreSQL. Modules: config,
   prisma, storage, files, parsing, extraction, normalization, matching, costing (the deterministic

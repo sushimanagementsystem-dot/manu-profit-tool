@@ -17,7 +17,15 @@
 ## Opened 2026-10-26
 | ID | Issue | Impact | Status / fix | Done |
 |---|---|---|---|---|
-| KI-12 | The AI assistant has never run against the real model: `ANTHROPIC_API_KEY` is not set. | Chat and chat-driven corrections — the only correction channel in Release 1 — are unverified. `/health` reports `assistant: false`. | Set the key in `backend/.env`, then run the scripted questions in TESTING_STRATEGY.md §4. | ⬜ |
+| KI-12 | ~~The AI assistant has never run against the real model~~ | — | **Resolved 2026-10-27**: the key is set, `/health` reports `assistant: true`, and the chat was driven end to end through the UI — a question, a recipe + VAT correction, Apply, and a multi-turn follow-up. Figures hand-checked (see PROGRESS.md). | ✅ |
 | KI-13 | PDF and photo uploads are accepted at the upload step but fail during extraction, because the n8n workflows do not exist. | Clients who only have PDF invoices cannot complete an analysis. The message tells them to upload CSV/Excel instead. | Build MP-01/02/99 per docs/N8N_WORKFLOWS.md, or reject those types at upload until then. | ⬜ |
 | KI-14 | No integration tests against `menu_profit_test`, and only one mock dataset. | Regressions in routing, guards and cascade deletes would not be caught. | Phase 10; datasets DS-2…DS-10 in TESTING_STRATEGY.md. | ⬜ |
 | KI-15 | `AnalysisJob.idempotencyKey` exists in the schema but nothing sets it. | Dead column; a retried `POST /jobs` creates a second job. | Either wire up the `Idempotency-Key` header or drop the column in the next migration. | ⬜ |
+
+## Opened 2026-10-27
+| ID | Issue | Impact | Status / fix | Done |
+|---|---|---|---|---|
+| KI-16 | ~~Every upload slot read "Loading…" until the first file was picked~~ | — | **Resolved 2026-10-27**: the limits rode on the draft-job response, and the draft job is deliberately created only on the first file, so nothing was ever loading. Added `GET /upload-limits` and the upload screen now fetches it on mount. Found by driving the UI with Playwright. | ✅ |
+| KI-17 | If `GET /upload-limits` fails, the slots keep the "Loading…" label indefinitely. | Cosmetic, and only when the API is unreachable — in which case uploads fail anyway. The server still enforces every rule. | Give the upload screen a visible "cannot reach the server" state instead of a per-slot label. | ⬜ |
+| KI-18 | `GET /jobs/:id` reports `progress.stage: CALCULATING, percent: 99` after `status` has become `READY`. | API-only cosmetic inconsistency; the UI switches on `status`, so nothing is shown wrong. | Clear or complete the progress record when the pipeline finishes. | ⬜ |
+| KI-19 | The analysis treats menu prices as VAT-inclusive but POS "Net Sales" as VAT-exclusive, so per-portion GP (€11.79) and realised GP per unit (€10.51) differ for the same dish. | Defensible — "net sales" normally means net of VAT — but a client may ask why the two figures disagree. | Confirm with the first real client which basis their POS export uses, and state the assumption in the Summary sheet. | ⬜ |

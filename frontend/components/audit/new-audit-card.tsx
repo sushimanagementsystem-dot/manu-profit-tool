@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
   BarChart3,
@@ -40,6 +40,25 @@ export function NewAuditCard() {
   const job = useRef<CreatedJob | null>(null);
   const creating = useRef<Promise<CreatedJob> | null>(null);
   const uploads = useRef(new Map<string, UploadRecord>());
+
+  /**
+   * The rules are fetched on their own, so every slot can state what it accepts before
+   * a file is picked — the draft job that also carries them does not exist yet.
+   */
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .uploadLimits()
+      .then((fetched) => {
+        if (!cancelled) setLimits(fetched);
+      })
+      .catch(() => {
+        // Not fatal: the slot keeps its waiting label and the server still enforces the rules.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   /**
    * The draft job is created on the first file, not on page load: an abandoned page
