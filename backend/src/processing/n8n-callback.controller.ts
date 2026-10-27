@@ -1,4 +1,4 @@
-import { Controller, Headers, HttpCode, Post, Req } from '@nestjs/common';
+import { Controller, Headers, HttpCode, Logger, Post, Req } from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
 import type { Request } from 'express';
 import { z } from 'zod';
@@ -44,6 +44,8 @@ const RESULT_SCHEMAS = {
  */
 @Controller('internal/n8n')
 export class N8nCallbackController {
+  private readonly logger = new Logger(N8nCallbackController.name);
+
   constructor(
     @InjectConfig() private readonly config: AppConfig,
     private readonly prisma: PrismaService,
@@ -83,6 +85,12 @@ export class N8nCallbackController {
     await this.recordUsage(task.jobId, body.usage);
 
     if (body.status === 'FAILED') {
+      // The restaurant gets a message it can act on; whoever runs this needs the real one,
+      // which is the only place n8n's side of the failure is ever visible from here.
+      this.logger.warn(
+        `Extraction failed: task=${task.id} attempt=${body.attempt} execution=${body.executionId ?? '-'} ` +
+          `code=${body.error?.code ?? 'ai_error'} detail=${body.error?.message ?? '(none)'}`,
+      );
       await this.runner.failTask(task, new RetryableTaskError(body.error?.code ?? 'ai_error', 'The AI extraction service could not read this file.'));
       return { accepted: true };
     }
@@ -90,6 +98,10 @@ export class N8nCallbackController {
     const file = await this.prisma.uploadedFile.findUniqueOrThrow({ where: { id: task.fileId as string } });
     const parsed = RESULT_SCHEMAS[file.category].safeParse(body.result);
     if (!parsed.success) {
+      this.logger.warn(
+        `Extraction returned an unusable shape: task=${task.id} category=${file.category} ` +
+          `issues=${JSON.stringify(parsed.error.issues.slice(0, 5))}`,
+      );
       await this.runner.failTask(task, new RetryableTaskError('invalid_ai_output', 'The AI extraction returned data in an unexpected format.'));
       return { accepted: true };
     }

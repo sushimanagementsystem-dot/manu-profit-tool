@@ -43,7 +43,7 @@ const task = {
   callbackUrl: 'http://localhost:4000/api/v1/internal/n8n/callbacks',
 };
 
-function runNode(name, { inputItems, env = {}, nodeOutputs = {} }) {
+function runNode(name, { inputItems, env = {}, nodeOutputs = {}, helpers } = {}) {
   const context = {
     require: (m) => {
       if (m === 'crypto') return crypto;
@@ -58,9 +58,11 @@ function runNode(name, { inputItems, env = {}, nodeOutputs = {} }) {
       return { first: () => nodeOutputs[nodeName] };
     },
   };
-  return new vm.Script(`(function () {
+  // n8n binds `this` to the execution context, which is the only way to reach binary data
+  // the host keeps on disk — so the stub has to offer it the same way.
+  return new vm.Script(`(async function () {
 ${code[name]}
-})()`).runInNewContext(context, { timeout: 5000 });
+}).call(__ctx)`).runInNewContext({ ...context, __ctx: { helpers } }, { timeout: 5000 });
 }
 
 const asWebhookItem = (body) => ({
@@ -69,7 +71,7 @@ const asWebhookItem = (body) => ({
 });
 
 try {
-  const out = runNode('Read Task', { inputItems: [asWebhookItem(task)] });
+  const out = await runNode('Read Task', { inputItems: [asWebhookItem(task)] });
   ok('Read Task reads the body the backend sent', out[0].json.taskId === task.taskId);
 } catch (e) {
   ok('Read Task reads the body the backend sent', false, e.message);
@@ -84,7 +86,7 @@ for (const [label, body] of [
 ]) {
   let rejected = false;
   try {
-    runNode('Read Task', { inputItems: [asWebhookItem(body)] });
+    await runNode('Read Task', { inputItems: [asWebhookItem(body)] });
   } catch {
     rejected = true;
   }
@@ -92,15 +94,44 @@ for (const [label, body] of [
 }
 
 // 3. Build Claude Request — shape of the API call.
+const PDF_BASE64 = 'JVBERi0xLjQK';
+
+/**
+ * n8n stores binary either inline on the item or on disk, depending on the host's
+ * N8N_DEFAULT_BINARY_DATA_MODE. On a filesystem host the inline field is empty and only the
+ * helper reaches the bytes — reading the inline one there sent Anthropic "Invalid base64
+ * data", so both shapes are exercised.
+ */
+const binaryModes = {
+  memory: {
+    nodeOutputs: { 'Read Task': { json: task }, 'Download File': { binary: { data: { data: PDF_BASE64 } } } },
+  },
+  filesystem: {
+    nodeOutputs: { 'Read Task': { json: task }, 'Download File': { binary: { data: { data: '', id: 'on-disk' } } } },
+    helpers: { getBinaryDataBuffer: async () => Buffer.from(PDF_BASE64, 'base64') },
+  },
+};
+
 let built;
 try {
-  built = runNode('Build Claude Request', {
-    inputItems: [{ json: {} }],
-    nodeOutputs: {
-      'Read Task': { json: task },
-      'Download File': { binary: { data: { data: 'JVBERi0xLjQK' } } },
-    },
-  })[0].json;
+  for (const [mode, stub] of Object.entries(binaryModes)) {
+    const result = (await runNode('Build Claude Request', { inputItems: [{ json: {} }], ...stub }))[0].json;
+    ok(`the file is read in ${mode} binary mode`, result.request.messages[0].content[0].source.data === PDF_BASE64);
+    if (mode === 'memory') built = result;
+  }
+
+  // Nothing readable anywhere must fail loudly rather than send empty base64.
+  let threw = false;
+  try {
+    await runNode('Build Claude Request', {
+      inputItems: [{ json: {} }],
+      nodeOutputs: { 'Read Task': { json: task }, 'Download File': { binary: { data: { data: '' } } } },
+    });
+  } catch {
+    threw = true;
+  }
+  ok('an unreadable download is rejected, not sent as empty base64', threw);
+
   const r = built.request;
   ok('request targets the model the backend chose', r.model === 'claude-opus-5-5');
   ok('request uses a json_schema output format', r.output_config?.format?.type === 'json_schema');
@@ -134,10 +165,10 @@ for (const [label, response, expectedStatus] of [
   ['non-JSON text', { ...claudeOk, content: [{ type: 'text', text: 'sorry, I cannot' }] }, 'FAILED'],
 ]) {
   try {
-    const out = runNode('Build Callback', {
+    const out = (await runNode('Build Callback', {
       inputItems: [{ json: response }],
       nodeOutputs: { 'Build Claude Request': { json: built } },
-    })[0].json;
+    }))[0].json;
     ok(`Build Callback reports ${label} as ${expectedStatus}`, JSON.parse(out.body).status === expectedStatus);
   } catch (e) {
     ok(`Build Callback handles ${label}`, false, e.message);
@@ -146,10 +177,10 @@ for (const [label, response, expectedStatus] of [
 
 // 5. The callback body must satisfy the backend's Zod schema shape.
 try {
-  const out = runNode('Build Callback', {
+  const out = (await runNode('Build Callback', {
     inputItems: [{ json: claudeOk }],
     nodeOutputs: { 'Build Claude Request': { json: built } },
-  })[0].json;
+  }))[0].json;
   const parsed = JSON.parse(out.body);
   ok('callback carries schemaVersion "1"', parsed.schemaVersion === '1');
   ok('callback echoes taskId and attempt', parsed.taskId === task.taskId && parsed.attempt === 1);
@@ -169,13 +200,13 @@ if (process.argv.includes('--live')) {
     ok('live schema check', false, 'ANTHROPIC_API_KEY is not set');
   } else {
     for (const category of ['MENU', 'POS', 'INVOICE']) {
-      const request = runNode('Build Claude Request', {
+      const request = (await runNode('Build Claude Request', {
         inputItems: [{ json: {} }],
         nodeOutputs: {
           'Read Task': { json: { ...task, file: { ...task.file, category } } },
           'Download File': { binary: { data: { data: 'JVBERi0xLjQK' } } },
         },
-      })[0].json.request;
+      }))[0].json.request;
 
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
