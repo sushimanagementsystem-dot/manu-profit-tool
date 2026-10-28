@@ -16,10 +16,13 @@ export function DownloadCard({
   jobId,
   token,
   revision,
+  incomplete = false,
 }: {
   jobId: string;
   token: string;
   revision: number;
+  /** A file could not be read, so the workbook lacks its data. */
+  incomplete?: boolean;
 }) {
   const download = useMutation({
     mutationFn: async () => {
@@ -44,9 +47,13 @@ export function DownloadCard({
           <FileSpreadsheet className="size-5" />
         </span>
         <div className="flex-1">
-          <p className="text-sm font-semibold">Your analysis is ready</p>
+          <p className="text-sm font-semibold">
+            {incomplete ? "Your analysis is incomplete" : "Your analysis is ready"}
+          </p>
           <p className="text-sm text-muted-foreground">
-            Excel workbook with sales, costing, recommendations and what still needs review.
+            {incomplete
+              ? "A file could not be read, so this workbook is missing its data."
+              : "Excel workbook with sales, costing, recommendations and what still needs review."}
             {revision > 0 && ` Includes your ${revision} confirmed change${revision === 1 ? "" : "s"}.`}
           </p>
         </div>

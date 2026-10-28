@@ -9,10 +9,12 @@ import { AnalysisProgress } from "@/components/analysis/analysis-progress";
 import { AnalysisSummary } from "@/components/analysis/analysis-summary";
 import { ChatPanel } from "@/components/analysis/chat-panel";
 import { DownloadCard } from "@/components/analysis/download-card";
+import { IncompleteBanner } from "@/components/analysis/incomplete-banner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ApiError, api } from "@/lib/api/client";
 import { useJobToken } from "@/lib/api/job-session";
+import { unreadFiles } from "@/lib/audit/incomplete";
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -83,12 +85,20 @@ export function AnalysisWorkspace({ jobId }: { jobId: string }) {
     );
   }
 
+  const unread = unreadFiles(status.data.files);
+
   return (
     <div className="flex w-full max-w-3xl flex-col gap-4">
+      <IncompleteBanner files={unread} />
       {results.data ? (
         <>
           <AnalysisSummary results={results.data} />
-          <DownloadCard jobId={jobId} token={token} revision={results.data.revision} />
+          <DownloadCard
+            jobId={jobId}
+            token={token}
+            revision={results.data.revision}
+            incomplete={unread.length > 0}
+          />
           <ChatPanel
             jobId={jobId}
             token={token}

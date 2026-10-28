@@ -17,6 +17,10 @@ All notable changes to this repository. Frontend-internal history before 2026-10
   POS vendor's export, which is still the open risk for the first client.
 - **Fixed:** in a spreadsheet invoice with no pack column, "Unit Price" was taken by the pack-size field
   (through the word "unit") and the price came out empty.
+- **Added (frontend):** a red banner above the figures when a file could not be read, naming the file, the reason
+  and what the numbers lose because of it, and the download card says "incomplete". Found live: a POS file
+  with unreadable columns still gave a "ready" analysis showing revenue 0 and items sold 0, with the reason only
+  as a line in the issue list. Frontend tests 20 → 24.
 - **Tests:** `table-parsers.spec.ts` (10), the first tests the column matching has had. Backend 61 → 71.
 
 ### 2026-10-27 — MP-01 deployed; PDF extraction works end to end
