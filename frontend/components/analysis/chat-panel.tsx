@@ -28,11 +28,14 @@ export function ChatPanel({
   token,
   currency,
   disabled,
+  fill = false,
 }: {
   jobId: string;
   token: string;
   currency: string;
   disabled: boolean;
+  /** Take the full height of the container, scrolling the messages inside it. */
+  fill?: boolean;
 }) {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState("");
@@ -91,8 +94,8 @@ export function ChatPanel({
   const pendingQuestion = send.isPending ? send.variables : null;
 
   return (
-    <Card className="w-full">
-      <CardContent className="flex flex-col gap-4">
+    <Card className={cn("w-full", fill && "h-full min-h-0")}>
+      <CardContent className={cn("flex flex-col gap-4", fill && "h-full min-h-0")}>
         <div className="flex items-center gap-2">
           <Sparkles className="size-4 text-emerald-500" />
           <h2 className="text-sm font-semibold">Ask or correct</h2>
@@ -104,7 +107,12 @@ export function ChatPanel({
           </p>
         ) : (
           <>
-            <div className="flex max-h-[26rem] flex-col gap-3 overflow-y-auto">
+            <div
+              className={cn(
+                "flex flex-col gap-3 overflow-y-auto",
+                fill ? "min-h-0 flex-1" : "max-h-[26rem]",
+              )}
+            >
               {messages.length === 0 && !pendingQuestion && (
                 <p className="text-sm text-muted-foreground">
                   Ask about your results, or tell me what is wrong — for example &ldquo;the burger

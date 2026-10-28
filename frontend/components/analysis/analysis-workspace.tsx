@@ -9,8 +9,9 @@ import { AnalysisProgress } from "@/components/analysis/analysis-progress";
 import { AiCostCard } from "@/components/analysis/ai-cost-card";
 import { AnalysisSummary } from "@/components/analysis/analysis-summary";
 import { ChatPanel } from "@/components/analysis/chat-panel";
-import { DownloadCard } from "@/components/analysis/download-card";
+import { AnalysisHeader } from "@/components/analysis/analysis-header";
 import { IncompleteBanner } from "@/components/analysis/incomplete-banner";
+import { BrandHeader } from "@/components/audit/brand-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ApiError, api } from "@/lib/api/client";
@@ -52,73 +53,109 @@ export function AnalysisWorkspace({ jobId }: { jobId: string }) {
   });
 
   if (!tokenResolved || (token && status.isPending)) {
-    return <CenteredNote icon>Opening your analysis…</CenteredNote>;
+    return (
+      <StateShell>
+        <CenteredNote icon>Opening your analysis…</CenteredNote>
+      </StateShell>
+    );
   }
   if (!token) {
     return (
-      <CenteredNote title="This link is incomplete">
-        Open the analysis using the full link you were given, including the part after the
-        &ldquo;#&rdquo;.
-      </CenteredNote>
+      <StateShell>
+        <CenteredNote title="This link is incomplete">
+          Open the analysis using the full link you were given, including the part after the
+          &ldquo;#&rdquo;.
+        </CenteredNote>
+      </StateShell>
     );
   }
   if (status.error instanceof ApiError && status.error.isGone) {
     return (
-      <CenteredNote title="This analysis is no longer available">
-        Analyses and their files are deleted automatically after 48 hours. Start a new one to
-        analyse your data again.
-      </CenteredNote>
+      <StateShell>
+        <CenteredNote title="This analysis is no longer available">
+          Analyses and their files are deleted automatically after 48 hours. Start a new one to
+          analyse your data again.
+        </CenteredNote>
+      </StateShell>
     );
   }
   if (status.error || !status.data) {
     return (
-      <CenteredNote title="Could not load your analysis">
-        {status.error instanceof ApiError ? status.error.message : "Please try again."}
-      </CenteredNote>
+      <StateShell>
+        <CenteredNote title="Could not load your analysis">
+          {status.error instanceof ApiError ? status.error.message : "Please try again."}
+        </CenteredNote>
+      </StateShell>
     );
   }
 
   if (!isReady) {
     return (
-      <AnalysisProgress
-        status={status.data}
-        onRetry={() => retry.mutate()}
-        retrying={retry.isPending}
-      />
+      <StateShell>
+        <AnalysisProgress
+          status={status.data}
+          onRetry={() => retry.mutate()}
+          retrying={retry.isPending}
+        />
+      </StateShell>
     );
   }
 
   const unread = unreadFiles(status.data.files);
 
   return (
-    <div className="flex w-full max-w-3xl flex-col gap-4">
-      <IncompleteBanner files={unread} />
-      {results.data ? (
-        <>
-          <AnalysisSummary
-            results={results.data}
-            jobId={jobId}
-            token={token}
-            refreshing={results.isFetching}
-          />
-          <DownloadCard
-            jobId={jobId}
-            token={token}
-            revision={results.data.revision}
-            incomplete={unread.length > 0}
-          />
+    <>
+      <AnalysisHeader
+        jobId={jobId}
+        token={token}
+        expiresAt={status.data.expiresAt}
+        revision={results.data?.revision ?? 0}
+        incomplete={unread.length > 0}
+      />
+      <div className="mx-auto grid w-full max-w-[1488px] items-start gap-6 px-4 py-6 sm:px-6 min-[1180px]:grid-cols-[minmax(0,1fr)_372px]">
+        <main className="flex min-w-0 flex-col gap-4">
+          <IncompleteBanner files={unread} />
+          {results.data ? (
+            <>
+              <AnalysisSummary
+                results={results.data}
+                jobId={jobId}
+                token={token}
+                refreshing={results.isFetching}
+              />
+              <AiCostCard jobId={jobId} token={token} />
+            </>
+          ) : (
+            <CenteredNote icon>Loading your results…</CenteredNote>
+          )}
+          <AnalysisFooter jobId={jobId} token={token} expiresAt={status.data.expiresAt} />
+        </main>
+        <aside
+          aria-label="Assistant"
+          className="h-[640px] min-[1180px]:sticky min-[1180px]:top-20 min-[1180px]:h-[calc(100vh-6.5rem)] min-[1180px]:max-h-[900px] min-[1180px]:min-h-[560px]"
+        >
           <ChatPanel
             jobId={jobId}
             token={token}
-            currency={results.data.currency}
+            currency={results.data?.currency ?? "EUR"}
             disabled={false}
+            fill
           />
-          <AiCostCard jobId={jobId} token={token} />
-        </>
-      ) : (
-        <CenteredNote icon>Loading your results…</CenteredNote>
-      )}
-      <AnalysisFooter jobId={jobId} token={token} expiresAt={status.data.expiresAt} />
+        </aside>
+      </div>
+    </>
+  );
+}
+
+/**
+ * Everything that is not a ready analysis (opening, failed, expired, still working) keeps the
+ * narrow centred look it has always had; only a ready analysis uses the wide layout.
+ */
+function StateShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-5 px-6 py-12">
+      <BrandHeader />
+      {children}
     </div>
   );
 }
