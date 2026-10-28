@@ -115,7 +115,7 @@ export function ItemsTable({
   });
 
   return (
-    <div className="border-t pt-4" aria-busy={busy}>
+    <div aria-busy={busy}>
       <div className="flex h-5 items-center justify-end gap-1.5 px-2 text-xs text-muted-foreground" aria-live="polite">
         {busy ? (
           <>

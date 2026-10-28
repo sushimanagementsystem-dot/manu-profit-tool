@@ -59,8 +59,8 @@ The reference draws things that do not exist. They are either dropped or listed 
 |---|---|---|---|
 | 1 | High-fidelity prototype, desktop and phone, from the real dummy dataset | `screens/prototype/*` | Done |
 | 2 | Review and approve the design; settle the items in "Questions" below | A go / change decision | **Next** |
-| 3 | Design tokens and layout shell: header, two-column grid, sticky chat, responsive breakpoints | `analysis-workspace.tsx`, `globals.css` tokens | Planned |
-| 4 | Headline cards, coverage meter, attention strip | `analysis-summary.tsx` split into parts | Planned |
+| 3 | Design tokens and layout shell: header, two-column grid, sticky chat, responsive breakpoints | `analysis-workspace.tsx`, `globals.css` tokens | Done |
+| 4 | Headline cards, coverage meter, attention strip | `analysis-summary.tsx` split into parts | Done |
 | 5 | Table: toolbar (search, filters, sort), frozen first column, totals row, status pills, legend | `items-table.tsx` | Planned |
 | 6 | Issues panel with actions, recommendations block | new `issues-panel.tsx`, `recommendations.tsx` | Planned |
 | 7 | Chat panel: side layout, proposal card with before → after, composer | `chat-panel.tsx`, `proposal-card.tsx` | Planned |

@@ -2,14 +2,15 @@
 
 import { AlertTriangle, Info, TriangleAlert } from "lucide-react";
 
+import { AttentionStrip } from "@/components/analysis/attention-strip";
 import { ItemsTable } from "@/components/analysis/items-table";
+import { SummaryCards } from "@/components/analysis/summary-cards";
 import { Card, CardContent } from "@/components/ui/card";
 import type { ResultsResponse } from "@/lib/api/types";
-import { formatMoney, formatNumber, formatPercent } from "@/lib/format";
 
 const SEVERITY_STYLES = {
   critical: { icon: TriangleAlert, className: "text-destructive" },
-  warning: { icon: AlertTriangle, className: "text-amber-500" },
+  warning: { icon: AlertTriangle, className: "text-warning" },
   info: { icon: Info, className: "text-muted-foreground" },
 };
 
@@ -30,59 +31,36 @@ export function AnalysisSummary({
   refreshing: boolean;
 }) {
   const { summary, currency } = results;
-  const tiles = [
-    { label: "Net revenue", value: formatMoney(summary.netRevenue, currency) },
-    { label: "Items sold", value: formatNumber(summary.unitsSold) },
-    { label: "Gross profit", value: formatMoney(summary.realisedGp, currency) },
-    { label: "Gross profit %", value: formatPercent(summary.gpPercent) },
-  ];
 
   return (
-    <Card className="w-full">
-      <CardContent className="flex flex-col gap-5">
-        <dl
-          className={`grid grid-cols-2 gap-4 transition-opacity sm:grid-cols-4 ${refreshing ? "opacity-60" : ""}`}
-        >
-          {tiles.map((tile) => (
-            <div key={tile.label} className="flex flex-col gap-0.5">
-              <dt className="text-xs text-muted-foreground">{tile.label}</dt>
-              <dd className="text-xl font-semibold tabular-nums">{tile.value}</dd>
-            </div>
-          ))}
-        </dl>
+    <div className="flex w-full flex-col gap-4">
+      <SummaryCards summary={summary} currency={currency} refreshing={refreshing} />
+      <AttentionStrip results={results} />
+      <Card className="w-full">
+        <CardContent className="flex flex-col gap-5">
+          <ItemsTable
+            items={results.items}
+            currency={currency}
+            jobId={jobId}
+            token={token}
+            refreshing={refreshing}
+          />
 
-        <p className="border-t pt-4 text-sm text-muted-foreground">
-          Costs are complete for{" "}
-          <span className="font-medium text-foreground">
-            {summary.itemsCosted} of {summary.itemsTotal}
-          </span>{" "}
-          menu items, covering {formatPercent(summary.revenueCoveredPercent)} of your revenue.
-          {summary.itemsCosted < summary.itemsTotal &&
-            " Tell the assistant below what goes into the missing dishes to complete it."}
-        </p>
-
-        <ItemsTable
-          items={results.items}
-          currency={currency}
-          jobId={jobId}
-          token={token}
-          refreshing={refreshing}
-        />
-
-        {results.issues.length > 0 && (
-          <ul className="flex flex-col gap-2 border-t pt-4">
-            {results.issues.slice(0, 6).map((issue, index) => {
-              const { icon: Icon, className } = SEVERITY_STYLES[issue.severity];
-              return (
-                <li key={`${issue.code}-${index}`} className="flex items-start gap-2 text-sm">
-                  <Icon className={`mt-0.5 size-4 shrink-0 ${className}`} />
-                  <span className="text-muted-foreground">{issue.text}</span>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </CardContent>
-    </Card>
+          {results.issues.length > 0 && (
+            <ul className="flex flex-col gap-2 border-t pt-4">
+              {results.issues.slice(0, 6).map((issue, index) => {
+                const { icon: Icon, className } = SEVERITY_STYLES[issue.severity];
+                return (
+                  <li key={`${issue.code}-${index}`} className="flex items-start gap-2 text-sm">
+                    <Icon className={`mt-0.5 size-4 shrink-0 ${className}`} />
+                    <span className="text-muted-foreground">{issue.text}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
