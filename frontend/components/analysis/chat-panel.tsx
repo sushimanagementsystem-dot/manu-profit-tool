@@ -50,6 +50,7 @@ export function ChatPanel({
   });
 
   const messages = history.data ?? [];
+  const waiting = messages.filter((message) => message.proposal?.status === "PROPOSED").length;
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -97,9 +98,20 @@ export function ChatPanel({
   return (
     <Card className={cn("w-full", fill && "h-full min-h-0")}>
       <CardContent className={cn("flex flex-col gap-4", fill && "h-full min-h-0")}>
-        <div className="flex items-center gap-2">
-          <Sparkles className="size-4 text-emerald-500" />
-          <h2 className="text-sm font-semibold">Ask or correct</h2>
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <Sparkles className="size-4 text-brand" aria-hidden />
+            <h2 className="text-sm font-semibold">Ask or correct</h2>
+            {waiting > 0 && (
+              <span className="ml-auto rounded-full border border-warning-line bg-warning-soft px-2 py-0.5 text-xs font-medium text-warning">
+                {waiting} waiting for your OK
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Ask about your figures, or describe what is wrong. Changes are shown first and only
+            applied when you say so.
+          </p>
         </div>
 
         {disabled ? (
@@ -217,7 +229,7 @@ function Bubble({
       >
         {message.content}
       </div>
-      {children && <div className="w-full max-w-[85%]">{children}</div>}
+      {children && <div className="w-full">{children}</div>}
     </div>
   );
 }
