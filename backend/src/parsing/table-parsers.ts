@@ -3,7 +3,7 @@ import type {
   MenuExtraction,
   PosExtraction,
 } from '../extraction/extraction.schemas';
-import { detectColumns, type ColumnMap, type FieldSynonyms } from './column-detect';
+import { describeHeaderRow, detectColumns, type ColumnMap, type FieldSynonyms } from './column-detect';
 import {
   cellText,
   detectDecimalSeparator,
@@ -17,9 +17,22 @@ import {
 /** Thrown when a spreadsheet has no recognisable header; the message is shown to the client. */
 export class TableFormatError extends Error {}
 
+/** What a client is asked for when a required column is missing; the field names are internal. */
+const FIELD_LABELS: Record<string, string> = {
+  name: 'item name',
+  price: 'selling price',
+  itemName: 'item name',
+  quantity: 'quantity sold',
+  description: 'product description',
+  lineNet: 'line total (net amount)',
+};
+
+// Matching is on whole words of the header ("Item Qty" matches "qty"), so a synonym only needs
+// adding when it brings a word the lists below do not already contain. Avoid bare codes such as
+// "plu", "sku" or "code": those columns hold ids, and mapping one as a name would read garbage.
 const MENU_COLUMNS: FieldSynonyms<'name' | 'price' | 'category' | 'description'> = {
-  name: ['menu item', 'item name', 'dish', 'item', 'name', 'product', 'article'],
-  price: ['selling price', 'sell price', 'menu price', 'sales price', 'price', 'prijs', 'preis'],
+  name: ['menu item', 'item name', 'dish', 'item', 'name', 'product', 'article', 'title', 'menu entry'],
+  price: ['selling price', 'sell price', 'menu price', 'sales price', 'price', 'rrp', 'prijs', 'preis'],
   category: ['category', 'section', 'group', 'course', 'department'],
   description: ['description', 'details', 'desc'],
 };
@@ -27,11 +40,17 @@ const MENU_COLUMNS: FieldSynonyms<'name' | 'price' | 'category' | 'description'>
 const POS_COLUMNS: FieldSynonyms<
   'itemName' | 'quantity' | 'netRevenue' | 'grossRevenue' | 'category' | 'date'
 > = {
-  itemName: ['item name', 'menu item', 'product name', 'plu name', 'item', 'product', 'name', 'article', 'description'],
-  quantity: ['qty sold', 'quantity sold', 'items sold', 'units sold', 'quantity', 'qty', 'units', 'sold', 'count', 'number'],
-  netRevenue: ['net sales', 'net revenue', 'sales ex vat', 'revenue ex vat', 'net amount', 'ex vat', 'excl vat', 'net'],
-  grossRevenue: ['gross sales', 'total sales', 'sales inc vat', 'revenue inc vat', 'gross', 'sales', 'revenue', 'total', 'amount', 'value'],
-  category: ['category', 'group', 'department', 'family', 'section', 'major group'],
+  itemName: ['item name', 'menu item', 'product name', 'plu name', 'item', 'product', 'name', 'article', 'dish', 'title', 'description'],
+  quantity: ['qty sold', 'quantity sold', 'items sold', 'units sold', 'quantity', 'qty', 'units', 'sold', 'count', 'number', 'pcs', 'portions'],
+  netRevenue: [
+    'net sales', 'net revenue', 'sales ex vat', 'revenue ex vat', 'net amount', 'ex vat', 'excl vat',
+    'exc vat', 'ex tax', 'excl tax', 'exc tax', 'before vat', 'before tax', 'pre vat', 'pre tax', 'without vat', 'net',
+  ],
+  grossRevenue: [
+    'gross sales', 'total sales', 'sales inc vat', 'revenue inc vat', 'incl vat', 'inc vat', 'incl tax',
+    'inc tax', 'with vat', 'takings', 'turnover', 'gross', 'sales', 'revenue', 'total', 'amount', 'value',
+  ],
+  category: ['category', 'group', 'department', 'family', 'section', 'major group', 'revenue group', 'report group'],
   date: ['business date', 'date', 'day', 'period'],
 };
 
@@ -46,15 +65,17 @@ const INVOICE_COLUMNS: FieldSynonyms<
   | 'invoiceNumber'
   | 'invoiceDate'
 > = {
-  description: ['product description', 'description', 'product', 'item', 'article', 'name'],
-  quantity: ['quantity', 'qty', 'units', 'cases'],
+  description: ['product description', 'item description', 'description', 'product', 'item', 'article', 'goods', 'name'],
+  quantity: ['quantity', 'qty', 'units', 'cases', 'ordered', 'delivered', 'pcs'],
+  // unitPrice must come before packSize: fields are assigned in this order, and without it a bare
+  // "Unit Price" header (no pack column in the file) is taken by packSize through its word "unit".
+  unitPrice: ['unit price', 'unit cost', 'price per unit', 'cost price', 'price', 'rate', 'cost'],
   packSize: ['pack size', 'pack', 'size', 'unit size', 'uom', 'unit'],
-  unitPrice: ['unit price', 'price per unit', 'price', 'rate', 'cost'],
-  lineNet: ['net amount', 'line total', 'net', 'amount', 'total', 'value'],
+  lineNet: ['net amount', 'line total', 'line net', 'line value', 'net total', 'ex vat', 'excl vat', 'subtotal', 'net', 'amount', 'total', 'value'],
   vatRate: ['vat rate', 'vat %', 'tax rate', 'vat'],
-  supplier: ['supplier', 'vendor'],
-  invoiceNumber: ['invoice number', 'invoice no', 'invoice', 'document number'],
-  invoiceDate: ['invoice date', 'date'],
+  supplier: ['supplier', 'vendor', 'seller', 'company'],
+  invoiceNumber: ['invoice number', 'invoice no', 'inv no', 'inv number', 'document number', 'document no', 'doc no', 'invoice', 'reference'],
+  invoiceDate: ['invoice date', 'inv date', 'document date', 'tax point', 'date'],
 };
 
 type Table<F extends string> = {
@@ -71,8 +92,14 @@ function prepare<F extends string>(
 ): Table<F> {
   const detection = detectColumns(rows, synonyms, required);
   if (!detection) {
+    const needed = required.map((field) => FIELD_LABELS[field] ?? field).join(' and ');
+    const seen = describeHeaderRow(rows);
     throw new TableFormatError(
-      `Could not find the ${label} columns. Expected a header row with ${required.join(' and ')}.`,
+      `Could not find the ${label} columns: we need ${needed}. ` +
+        (seen.length
+          ? `The columns in your file look like: ${seen.map((header) => `"${header}"`).join(', ')}. ` +
+            'Please rename them, or re-export the report with those columns.'
+          : 'The file has no header row; please add one as the first row.'),
     );
   }
   const dataRows = rows

@@ -5,6 +5,20 @@ All notable changes to this repository. Frontend-internal history before 2026-10
 
 ## [Unreleased]
 
+### 2026-10-28 — Live deployment; a spreadsheet we cannot read now says why
+- **Deployed:** backend and frontend run on the project's Coolify host, and a PDF invoice goes upload →
+  n8n → Claude → callback → `READY` there (about 25 s). Found on the way: `crypto.randomUUID` does not exist
+  over plain HTTP, so the upload card silently dropped every file (fixed), and a stale
+  `PUBLIC_API_BASE_URL` still pointing at a dead tunnel made n8n unable to download anything.
+- **Changed:** when a CSV/Excel file has no recognisable header, the message now names what is needed
+  ("item name and quantity sold") and lists the columns the file does have, instead of an internal field name.
+- **Added:** more header synonyms (VAT-basis wording such as "excl. tax", "takings", "turnover", "RRP",
+  "Item Description", "Inv No", "Qty Delivered"…). They are generic guesses; none was checked against a real
+  POS vendor's export, which is still the open risk for the first client.
+- **Fixed:** in a spreadsheet invoice with no pack column, "Unit Price" was taken by the pack-size field
+  (through the word "unit") and the price came out empty.
+- **Tests:** `table-parsers.spec.ts` (10), the first tests the column matching has had. Backend 61 → 71.
+
 ### 2026-10-27 — MP-01 deployed; PDF extraction works end to end
 - **Deployed:** MP-01 is published on the n8n host, authenticated entirely through n8n's own
   credential store. A real PDF supplier invoice now goes upload → dispatch → signed file URL →

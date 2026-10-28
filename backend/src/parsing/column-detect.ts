@@ -39,6 +39,19 @@ export function detectColumns<F extends string>(
   return best?.detection ?? null;
 }
 
+/**
+ * The cells of the row that looks most like a header, so a client whose file we could not read is
+ * told what we saw instead of what we wanted. Ties go to the earlier row.
+ */
+export function describeHeaderRow(rows: Cell[][], limit = 10): string[] {
+  let best: string[] = [];
+  for (const row of rows.slice(0, 20)) {
+    const texts = row.map(cellText).filter((text) => /[a-z]/i.test(text));
+    if (texts.length > best.length) best = texts;
+  }
+  return best.slice(0, limit).map((text) => (text.length > 30 ? `${text.slice(0, 29)}…` : text));
+}
+
 function assignColumns<F extends string>(headers: string[], synonyms: FieldSynonyms<F>) {
   const columns: ColumnMap<F> = {};
   const used = new Set<number>();
