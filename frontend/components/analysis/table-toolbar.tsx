@@ -75,7 +75,7 @@ export function TableToolbar({
               aria-pressed={active}
               onClick={() => onFilterChange(key)}
               className={cn(
-                "cursor-pointer rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                "cursor-pointer rounded-full border px-3 py-1 text-xs font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                 active
                   ? "border-brand-line bg-brand-soft text-brand-ink"
                   : "text-muted-foreground hover:bg-muted",

@@ -53,7 +53,8 @@ export function ChatPanel({
   const waiting = messages.filter((message) => message.proposal?.status === "PROPOSED").length;
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    endRef.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "end" });
   }, [messages.length]);
 
   const send = useMutation({

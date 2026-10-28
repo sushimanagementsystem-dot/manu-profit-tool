@@ -113,7 +113,8 @@ export function AnalysisWorkspace({ jobId }: { jobId: string }) {
         incomplete={unread.length > 0}
       />
       <div className="mx-auto grid w-full max-w-[1488px] items-start gap-6 px-4 py-6 sm:px-6 min-[1180px]:grid-cols-[minmax(0,1fr)_372px]">
-        <main className="flex min-w-0 flex-col gap-4">
+        <main id="figures" tabIndex={-1} className="flex min-w-0 flex-col gap-4 outline-none">
+          <h1 className="sr-only">Menu profit analysis</h1>
           <IncompleteBanner files={unread} />
           {results.data ? (
             <>

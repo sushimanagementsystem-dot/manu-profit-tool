@@ -27,6 +27,12 @@ export function AnalysisHeader({
 }) {
   return (
     <header className="sticky top-0 z-30 border-b bg-background/80 backdrop-blur-md">
+      <a
+        href="#figures"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-40 focus:rounded-lg focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:shadow-md focus:ring-2 focus:ring-ring"
+      >
+        Skip to the figures
+      </a>
       <div className="mx-auto flex h-16 w-full max-w-[1488px] items-center gap-2 px-4 sm:px-6">
         <div className="mr-auto shrink-0 whitespace-nowrap">
           <BrandHeader />

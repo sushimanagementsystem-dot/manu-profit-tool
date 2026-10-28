@@ -64,7 +64,7 @@ The reference draws things that do not exist. They are either dropped or listed 
 | 5 | Table: toolbar (search, filters, sort), frozen first column, totals row, status pills, legend | `items-table.tsx` | Done |
 | 6 | Issues panel with actions, recommendations block | new `issues-panel.tsx`, `recommendations.tsx` | Done |
 | 7 | Chat panel: side layout, proposal card with before → after, composer | `chat-panel.tsx`, `proposal-card.tsx` | Done |
-| 8 | Accessibility, reduced motion, keyboard pass; screenshots vs prototype; deploy | Report | Planned |
+| 8 | Accessibility, reduced motion, keyboard pass; screenshots vs prototype; deploy | Report | Built; deploy pending |
 
 Each implementation step ships on its own and keeps the screen working, so the work can stop after any of them.
 
@@ -95,3 +95,17 @@ None required for steps 3–8, except the optional assumptions field (question 2
   table; the design shows the product as it is.
 - Denser tables are harder to edit on a phone. Mitigated by a frozen first column and 44 px touch targets for the
   edit controls.
+
+## Outcome (steps 3–8)
+
+Built on the existing screen; no backend change. Final screenshots: `docs/screens/final/`.
+
+**Differences from the prototype, on purpose**
+- **Assumption chips (VAT, price basis) in the header: not built.** The results API does not return the assumptions; adding them is a small backend change and was left out of this frontend-only phase. Tracked as an open item.
+- **"Edited by you" filter became "Cost set by you":** the API only says whether a cost was entered by hand, not whether a name or units were edited.
+- **Table totals cover the menu rows shown**, so they are lower than the headline cards, which also include POS lines not matched to a menu item (the attention strip says so).
+- Proposal "before → after" item rows exist only in the session that created the proposal (the API does not return the impact again); unchanged from before this phase.
+
+**Accessibility pass (step 8):** one `h1` (visually hidden), `header`/`main`/`aside` landmarks, skip link, logical Tab order, labelled controls, no duplicate ids, tap targets ≥ 24 px, reduced-motion respected for the smooth scrolls and the row flash, filter chips with a focus ring, and the brand colour deepened so white-on-brand text is 5.1:1 (it was 3.5:1). Checked at 1440 and 390 px; no page-level horizontal scroll.
+
+**Not yet done:** push and redeploy (backend redeploys on push; the frontend needs a manual Redeploy).

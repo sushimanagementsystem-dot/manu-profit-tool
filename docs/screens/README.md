@@ -25,3 +25,6 @@ Design material for the screens of Menu Profit. Today there is one screen under 
   never typed in, so a design cannot show numbers the engine would not produce.
 - A prototype must not draw something as if it worked when it does not exist. Anything the product cannot do today
   is listed in the phase document as new work.
+
+## final/
+`analysis-screen-final-desktop.png` (1440 × 1000) and `analysis-screen-final-mobile.png` (390 × 844): the built screen, from the same test job as `current/`, for comparison with `prototype/`.

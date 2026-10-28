@@ -77,7 +77,8 @@
   /* Menu Profit's own palette: emerald is the brand and "good", amber is caution, rose is wrong. */
   --destructive-soft: oklch(0.969 0.015 12.422);
   --destructive-line: oklch(0.892 0.058 10.001);
-  --brand: oklch(0.596 0.145 163.225);
+  /* Deep enough that white text on it passes AA (5.5:1). */
+  --brand: oklch(0.508 0.118 165.612);
   --brand-foreground: oklch(0.985 0 0);
   --brand-soft: oklch(0.979 0.021 166.113);
   --brand-line: oklch(0.905 0.093 164.15);

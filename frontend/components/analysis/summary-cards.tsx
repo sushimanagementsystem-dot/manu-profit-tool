@@ -87,7 +87,11 @@ function Stat({
           >
             {value}
           </span>
-          {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
+          {hint && (
+            <span className={cn("text-xs", hero ? "text-brand-ink" : "text-muted-foreground")}>
+              {hint}
+            </span>
+          )}
           {children}
         </dd>
       </CardContent>
