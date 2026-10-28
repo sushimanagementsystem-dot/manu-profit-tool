@@ -20,8 +20,8 @@ All notable changes to this repository. Frontend-internal history before 2026-10
 - **Tests:** backend 71 → 87, frontend 24 → 43. Checked by hand in the browser: figures after each edit against a
   hand calculation, an invalid value, a refused one, Escape, a phone-width screen, the Excel workbook, and the
   assistant answering the same question before and after a table edit.
-- **Opened:** KI-21 (the upload slots read "Loading…" for 5–20 s), KI-22 (chat changes still need Apply), KI-23 (one
-  unexplained extra revision while testing).
+- **Opened:** KI-22 (chat changes still need Apply) and KI-23 (one unexplained extra revision while testing). KI-21
+  (slow "Loading…") was opened and withdrawn the same day: the delay was the test tool, not the app.
 
 ### 2026-10-28 — Live deployment; a spreadsheet we cannot read now says why
 - **Deployed:** backend and frontend run on the project's Coolify host, and a PDF invoice goes upload →
