@@ -61,7 +61,7 @@ The reference draws things that do not exist. They are either dropped or listed 
 | 2 | Review and approve the design; settle the items in "Questions" below | A go / change decision | **Next** |
 | 3 | Design tokens and layout shell: header, two-column grid, sticky chat, responsive breakpoints | `analysis-workspace.tsx`, `globals.css` tokens | Done |
 | 4 | Headline cards, coverage meter, attention strip | `analysis-summary.tsx` split into parts | Done |
-| 5 | Table: toolbar (search, filters, sort), frozen first column, totals row, status pills, legend | `items-table.tsx` | Planned |
+| 5 | Table: toolbar (search, filters, sort), frozen first column, totals row, status pills, legend | `items-table.tsx` | Done |
 | 6 | Issues panel with actions, recommendations block | new `issues-panel.tsx`, `recommendations.tsx` | Planned |
 | 7 | Chat panel: side layout, proposal card with before → after, composer | `chat-panel.tsx`, `proposal-card.tsx` | Planned |
 | 8 | Accessibility, reduced motion, keyboard pass; screenshots vs prototype; deploy | Report | Planned |

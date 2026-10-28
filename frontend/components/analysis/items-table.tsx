@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { EditableCell } from "@/components/analysis/editable-cell";
+import { TableToolbar } from "@/components/analysis/table-toolbar";
 import { ApiError, api } from "@/lib/api/client";
 import type { Metric, ResultItem } from "@/lib/api/types";
 import { changedItemIds } from "@/lib/audit/item-diff";
@@ -16,16 +17,41 @@ import {
   validateEdit,
   type EditField,
 } from "@/lib/audit/item-edit";
+import {
+  filterCounts,
+  isEstimate,
+  totals,
+  viewItems,
+  type ItemFilter,
+  type ItemSort,
+} from "@/lib/audit/item-view";
 import { formatMoney, formatNumber, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-/** Menu-engineering class, in the words the Excel workbook uses. */
+/** Menu-engineering class, in the words the Excel workbook uses, with what it tells the owner. */
 const CLASS_LABELS: Record<NonNullable<ResultItem["matrixClass"]>, string> = {
   STAR: "Star",
   PLOWHORSE: "Plowhorse",
   PUZZLE: "Puzzle",
   DOG: "Dog",
 };
+
+const CLASS_HINTS: Record<NonNullable<ResultItem["matrixClass"]>, string> = {
+  STAR: "Sells well and earns well: protect it.",
+  PLOWHORSE: "Sells well but earns little: look at its cost or price.",
+  PUZZLE: "Earns well but sells little: promote it.",
+  DOG: "Sells little and earns little: consider dropping it.",
+};
+
+const CLASS_STYLES: Record<NonNullable<ResultItem["matrixClass"]>, string> = {
+  STAR: "border-brand-line bg-brand-soft text-brand-ink",
+  PLOWHORSE: "border-warning-line bg-warning-soft text-warning",
+  PUZZLE: "border-border bg-muted text-foreground",
+  DOG: "border-destructive-line bg-destructive-soft text-destructive",
+};
+
+/** The item column stays in view while the figures scroll sideways on a phone. */
+const FROZEN = "sticky left-0 z-10 bg-card px-2 shadow-[1px_0_0_var(--border)]";
 
 /** How long a row stays highlighted after an edit changed it. */
 const HIGHLIGHT_MS = 3000;
@@ -59,6 +85,9 @@ export function ItemsTable({
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<Editing>(null);
   const [changed, setChanged] = useState<string[]>([]);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<ItemFilter>("all");
+  const [sort, setSort] = useState<ItemSort>("sold");
   const previous = useRef<ResultItem[] | null>(null);
 
   const apply = useMutation({
@@ -85,9 +114,8 @@ export function ItemsTable({
 
   if (items.length === 0) return null;
 
-  const byUnitsSold = [...items].sort(
-    (a, b) => Number(b.unitsSold ?? 0) - Number(a.unitsSold ?? 0),
-  );
+  const shown = viewItems(items, { query, filter, sort });
+  const sums = totals(shown);
   const busy = apply.isPending || refreshing;
   const changedNames = items.filter((item) => changed.includes(item.menuItemId)).map((item) => item.name);
 
@@ -115,7 +143,16 @@ export function ItemsTable({
   });
 
   return (
-    <div aria-busy={busy}>
+    <div aria-busy={busy} className="flex flex-col gap-3">
+      <TableToolbar
+        query={query}
+        onQueryChange={setQuery}
+        filter={filter}
+        onFilterChange={setFilter}
+        counts={filterCounts(items)}
+        sort={sort}
+        onSortChange={setSort}
+      />
       <div className="flex h-5 items-center justify-end gap-1.5 px-2 text-xs text-muted-foreground" aria-live="polite">
         {busy ? (
           <>
@@ -129,7 +166,7 @@ export function ItemsTable({
       <div className="-mx-2 overflow-x-auto">
         <table
           className={cn(
-            "w-full min-w-[48rem] border-collapse text-sm tabular-nums transition-opacity",
+            "w-full min-w-[58rem] border-collapse text-sm tabular-nums transition-opacity",
             busy && "opacity-60",
           )}
         >
@@ -139,7 +176,7 @@ export function ItemsTable({
           </caption>
           <thead>
             <tr className="border-b text-xs text-muted-foreground">
-              <th scope="col" className="px-2 py-2 text-left font-medium">
+              <th scope="col" className={cn(FROZEN, "py-2 text-left font-medium")}>
                 Item
               </th>
               <th scope="col" className="px-2 py-2 text-right font-medium">
@@ -160,21 +197,24 @@ export function ItemsTable({
               <th scope="col" className="px-2 py-2 text-right font-medium">
                 GP %
               </th>
+              <th scope="col" className="px-2 py-2 text-right font-medium" title="Net price times units sold">
+                Revenue
+              </th>
               <th scope="col" className="px-2 py-2 text-left font-medium">
                 Class
               </th>
             </tr>
           </thead>
           <tbody>
-            {byUnitsSold.map((item) => (
+            {shown.map((item) => (
               <tr
                 key={item.menuItemId}
                 className={cn(
                   "border-b transition-colors duration-700 last:border-0",
-                  changed.includes(item.menuItemId) && "bg-emerald-500/10",
+                  changed.includes(item.menuItemId) && "bg-brand-soft",
                 )}
               >
-                <th scope="row" className="px-2 py-1.5 text-left font-medium">
+                <th scope="row" className={cn(FROZEN, "py-1.5 text-left font-medium", changed.includes(item.menuItemId) && "bg-brand-soft")}>
                   <EditableCell
                     {...cell(item, "name")}
                     label={`name of ${item.name}`}
@@ -219,7 +259,11 @@ export function ItemsTable({
                     align="right"
                     placeholder="empty = use recipe"
                   >
-                    {formatMoney(item.costPerPortion.value, currency)}
+                    {item.costPerPortion.value === null ? (
+                      <span className="text-xs font-medium text-brand-ink">+ Add cost</span>
+                    ) : (
+                      formatMoney(item.costPerPortion.value, currency)
+                    )}
                     {item.costSource === "MANUAL" && (
                       <span className="ml-1 text-xs italic text-muted-foreground">set</span>
                     )}
@@ -228,25 +272,57 @@ export function ItemsTable({
                 </td>
                 <MetricCell metric={item.gpPerPortion} format={(v) => formatMoney(v, currency)} />
                 <MetricCell metric={item.gpPercent} format={formatPercent} />
-                <td className="px-2 py-1.5 text-left text-muted-foreground">
-                  {item.matrixClass ? CLASS_LABELS[item.matrixClass] : "—"}
+                <MetricCell metric={item.netRevenue} format={(v) => formatMoney(v, currency)} />
+                <td className="px-2 py-1.5 text-left">
+                  {item.matrixClass ? (
+                    <span
+                      title={CLASS_HINTS[item.matrixClass]}
+                      className={cn(
+                        "inline-block rounded-full border px-2 py-0.5 text-xs font-medium",
+                        CLASS_STYLES[item.matrixClass],
+                      )}
+                    >
+                      {CLASS_LABELS[item.matrixClass]}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
                 </td>
               </tr>
             ))}
+            {shown.length === 0 && (
+              <tr>
+                <td colSpan={9} className="px-2 py-8 text-center text-muted-foreground">
+                  No items match. Clear the search or choose &ldquo;All&rdquo;.
+                </td>
+              </tr>
+            )}
           </tbody>
+          {shown.length > 0 && (
+            <tfoot>
+              <tr className="border-t-2 text-sm font-semibold">
+                <th scope="row" className={cn(FROZEN, "py-2 text-left")}>
+                  {shown.length === items.length ? "Total" : `Total of ${shown.length} shown`}
+                </th>
+                <td className="px-2 py-2 text-right">{formatNumber(sums.unitsSold)}</td>
+                <td colSpan={5} />
+                <td className="px-2 py-2 text-right">{formatMoney(sums.netRevenue, currency)}</td>
+                <td />
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
-      <p className="px-2 pt-3 text-xs text-muted-foreground">
+      <p className="px-2 text-xs text-muted-foreground">
         Click a name, units sold, menu price or cost to edit it. Everything is recalculated and the
         Excel file follows. Leave a cost empty to go back to the recipe. A dash means the figure
-        could not be worked out yet, not zero. Figures marked <span className="italic">est.</span>{" "}
-        are estimates — hover to see why.
+        could not be worked out yet, not zero. <span className="italic">est.</span> marks an
+        estimate and <span className="italic">set</span> a cost you entered — hover to see why.
+        Totals cover the rows shown.
       </p>
     </div>
   );
 }
-
-const isEstimate = (metric: Metric) => metric.confidence === "ESTIMATED" && metric.value !== null;
 
 /** One figure, flagged when it is an estimate rather than something the data proves. */
 function MetricCell({
