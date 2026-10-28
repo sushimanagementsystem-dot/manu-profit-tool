@@ -113,7 +113,8 @@ export function NewAuditCard() {
     });
 
     for (const file of accepted) {
-      const key = `${file.name}-${file.size}-${crypto.randomUUID()}`;
+      // Not crypto.randomUUID(): that only exists in a secure context, so it is missing on plain HTTP.
+      const key = `${file.name}-${file.size}-${Math.random().toString(36).slice(2)}`;
       const controller = new AbortController();
       uploads.current.set(key, { controller });
 
