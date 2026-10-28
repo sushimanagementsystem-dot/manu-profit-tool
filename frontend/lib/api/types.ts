@@ -120,6 +120,8 @@ export type ResultsResponse = {
     code: string;
     severity: "info" | "warning" | "critical";
     text: string;
+    /** The menu item this is about, when it is about one. */
+    menuItemId?: string | null;
   }[];
   pendingMatches: {
     matchId: string;
@@ -132,6 +134,7 @@ export type ResultsResponse = {
     title: string;
     body: string;
     impactGp: string | null;
+    menuItemId?: string | null;
   }[];
 };
 

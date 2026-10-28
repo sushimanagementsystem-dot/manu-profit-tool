@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ApiError, api } from "@/lib/api/client";
 import type { ChatMessage, ImpactPreview } from "@/lib/api/types";
+import { ASSISTANT_INPUT_ID } from "@/lib/audit/jump";
 import { cn } from "@/lib/utils";
 
 const SUGGESTIONS = [
@@ -175,6 +176,7 @@ export function ChatPanel({
               }}
             >
               <Input
+                id={ASSISTANT_INPUT_ID}
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
                 placeholder="Ask a question or describe a correction…"

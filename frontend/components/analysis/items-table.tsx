@@ -25,6 +25,7 @@ import {
   type ItemFilter,
   type ItemSort,
 } from "@/lib/audit/item-view";
+import { itemRowId } from "@/lib/audit/jump";
 import { formatMoney, formatNumber, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -209,8 +210,9 @@ export function ItemsTable({
             {shown.map((item) => (
               <tr
                 key={item.menuItemId}
+                id={itemRowId(item.menuItemId)}
                 className={cn(
-                  "border-b transition-colors duration-700 last:border-0",
+                  "scroll-mt-24 border-b transition-colors duration-700 last:border-0",
                   changed.includes(item.menuItemId) && "bg-brand-soft",
                 )}
               >
