@@ -5,6 +5,7 @@ import { Problems } from '../common/problem';
 import { SnapshotService } from '../costing/snapshot.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AiUsageService } from '../usage/ai-usage.service';
+import { buildSystemNote, replayWindow } from './chat.compact';
 import { buildJobContext, CHAT_SYSTEM_PROMPT } from './chat.prompt';
 import { ChatToolExecutor } from './chat-tool.executor';
 import { buildToolDefinitions } from './chat.tools';
@@ -89,11 +90,11 @@ export class ChatService {
 
     const stored = await this.prisma.chatMessage.findMany({ where: { jobId }, orderBy: { seq: 'asc' } });
     const nextSeq = stored.length ? stored[stored.length - 1].seq + 1 : 0;
-    const lastSeenRevision = stored.length ? stored[stored.length - 1].revisionAtTime : null;
-    const note = lastSeenRevision !== null && revision > lastSeenRevision ? await this.changesSince(jobId, lastSeenRevision, revision) : null;
+    const last = stored.length ? stored[stored.length - 1] : null;
+    const note = last ? await this.systemNote(jobId, last.revisionAtTime, revision, last.createdAt) : null;
     const userTurn = await this.storeUserMessage(jobId, nextSeq, revision, text, stored.length === 0, note);
 
-    const history = stored.slice(-HISTORY_WINDOW).flatMap((message) => message.apiContent as unknown as ChatTurn[]);
+    const history = replayWindow(stored, HISTORY_WINDOW).flatMap((message) => message.apiContent as unknown as ChatTurn[]);
     const messages: ChatTurn[] = [...history, userTurn];
 
     const turnsBefore = messages.length;
@@ -132,7 +133,7 @@ export class ChatService {
       for (const toolUse of toolUses) {
         const outcome = await this.executor.execute(toolUse.name, toolUse.input, { jobId, revision });
         if (outcome.proposal) {
-          proposal = { info: outcome.proposal, impact: (outcome.result as { impact?: unknown }).impact };
+          proposal = { info: outcome.proposal, impact: outcome.impact };
         }
         results.push({
           type: 'tool_result',
@@ -149,24 +150,34 @@ export class ChatService {
   }
 
   /**
-   * What changed in the analysis since the assistant last saw it, whoever changed it: the client
-   * editing the table, or a change confirmed from the chat. Without this the assistant would go on
-   * quoting figures from earlier in the conversation that no longer hold.
+   * What happened since the assistant last replied, whoever did it: the client editing the table,
+   * a change confirmed from the chat, or a proposal the client turned down. Without this the
+   * assistant would go on quoting earlier figures that no longer hold, or offering a discarded change.
    */
-  private async changesSince(jobId: string, from: number, to: number): Promise<string> {
-    const revisions = await this.prisma.revision.findMany({
-      where: { jobId, status: 'APPROVED', number: { gt: from, lte: to } },
-      orderBy: { number: 'asc' },
-      select: { appliedDiff: true },
-    });
-    const changes = revisions.flatMap((revision) =>
+  private async systemNote(jobId: string, fromRevision: number, toRevision: number, since: Date): Promise<string | null> {
+    const [applied, discarded] = await Promise.all([
+      toRevision > fromRevision
+        ? this.prisma.revision.findMany({
+            where: { jobId, status: 'APPROVED', number: { gt: fromRevision, lte: toRevision } },
+            orderBy: { number: 'asc' },
+            select: { appliedDiff: true },
+          })
+        : Promise.resolve([]),
+      this.prisma.revision.findMany({
+        where: { jobId, status: 'REJECTED', decidedAt: { gt: since } },
+        orderBy: { decidedAt: 'asc' },
+        select: { rationale: true },
+      }),
+    ]);
+    const changes = applied.flatMap((revision) =>
       ((revision.appliedDiff as unknown as { description: string }[] | null) ?? []).map((effect) => effect.description),
     );
-    return (
-      `[System note, not from the user: the analysis changed since your last reply (revision ${from} to ${to}).` +
-      (changes.length ? ` Changes: ${changes.slice(0, 20).join('; ')}.` : '') +
-      ' Figures you quoted earlier may be out of date; look them up again with your tools before answering.]'
-    );
+    return buildSystemNote({
+      fromRevision,
+      toRevision,
+      changes,
+      discarded: discarded.map((revision) => revision.rationale ?? 'a change'),
+    });
   }
 
   /** The job summary rides along with the first question, keeping the system prompt cacheable. */

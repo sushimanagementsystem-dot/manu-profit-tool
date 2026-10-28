@@ -6,7 +6,9 @@ import { SnapshotService } from '../costing/snapshot.service';
 import type { SnapshotPayload } from '../costing/snapshot.serializer';
 import { normalizeName } from '../normalization/names';
 import { PrismaService } from '../prisma/prisma.service';
+import type { ImpactPreview } from '../revisions/impact';
 import { RevisionsService } from '../revisions/revisions.service';
+import { impactForModel } from './chat.compact';
 import { chatToolSchemas, type ChatToolName } from './chat.tools';
 
 export type ToolOutcome = {
@@ -15,9 +17,19 @@ export type ToolOutcome = {
   isError?: boolean;
   /** Set when the tool created a proposal the user must confirm. */
   proposal?: { revisionId: string; summary: string };
+  /** The full before/after for the confirmation card; the model is only given a trimmed copy. */
+  impact?: ImpactPreview;
 };
 
 type ToolContext = { jobId: string; revision: number };
+
+type MetricLike = { value: string | null; confidence: string; reasons: string[] };
+
+/** A figure as the model needs it: just the value when it is firm, with the caveat when it is not. */
+const plain = (metric: MetricLike) =>
+  metric.confidence === 'VERIFIED' && metric.value !== null
+    ? metric.value
+    : { value: metric.value, confidence: metric.confidence, reasons: metric.reasons.slice(0, 2) };
 
 /**
  * Runs the assistant's tools against one job. All data access is scoped to that job, and the
@@ -80,7 +92,8 @@ export class ChatToolExecutor {
       }
       case 'preview_changes': {
         const { operations } = input as { operations: never };
-        return { result: await this.revisions.preview(context.jobId, operations) };
+        const impact = await this.revisions.preview(context.jobId, operations);
+        return { result: impactForModel(impact) };
       }
       case 'propose_changes': {
         const { operations, summary } = input as { operations: never; summary: string };
@@ -89,8 +102,9 @@ export class ChatToolExecutor {
           result: {
             status: 'awaiting_confirmation',
             note: 'The user has been shown a confirmation card. Nothing is saved yet.',
-            impact: proposal.impact,
+            impact: impactForModel(proposal.impact),
           },
+          impact: proposal.impact,
           proposal: { revisionId: proposal.revisionId, summary },
         };
       }
@@ -134,13 +148,12 @@ export class ChatToolExecutor {
         name: item.name,
         category: item.category,
         netPrice: item.netPrice.value,
-        costPerPortion: item.costPerPortion.value,
+        costPerPortion: plain(item.costPerPortion),
         gpPerPortion: item.gpPerPortion.value,
         gpPercent: item.gpPercent.value,
         unitsSold: item.unitsSold,
         gpContribution: item.theoreticalGp.value,
         matrixClass: item.matrixClass,
-        confidence: item.confidence,
       }));
     return { currency: payload.currency, count: items.length, items };
   }
@@ -156,8 +169,21 @@ export class ChatToolExecutor {
     const unitCosts = new Map(payload.ingredients.map((ingredient) => [ingredient.ingredientId, ingredient.unitCost]));
 
     return {
-      ...item,
+      // Only what answers a question about one dish; the snapshot carries much more (mix %, VAT
+      // detail, a second copy of the recipe) that the model never needs.
+      menuItemId: item.menuItemId,
+      name: item.name,
+      category: item.category,
       currency: payload.currency,
+      grossPrice: item.grossPrice,
+      netPrice: plain(item.netPrice),
+      costPerPortion: plain(item.costPerPortion),
+      costSource: item.costSource,
+      gpPerPortion: plain(item.gpPerPortion),
+      gpPercent: plain(item.gpPercent),
+      unitsSold: item.unitsSold,
+      netRevenue: plain(item.netRevenue),
+      matrixClass: item.matrixClass,
       recipe: recipeLines.map((line) => ({
         recipeLineId: line.id,
         ingredientId: line.ingredient.id,

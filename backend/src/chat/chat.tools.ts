@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { operationsSchema } from '../revisions/operations.schema';
+import { compactSchemaForModel } from './chat.compact';
 
 /**
  * The assistant's entire capability surface. It can read this job's analysis and propose
@@ -14,7 +15,7 @@ export const chatToolSchemas = {
     order: z.enum(['asc', 'desc']).default('desc'),
     onlyMissingCost: z.boolean().default(false),
     category: z.string().max(100).optional(),
-    limit: z.number().int().min(1).max(50).default(20),
+    limit: z.number().int().min(1).max(50).default(10),
   }),
   get_item: z.object({ menuItemId: z.string().uuid() }),
   search_items: z.object({ query: z.string().min(1).max(100) }),
@@ -60,6 +61,7 @@ export function buildToolDefinitions(): ToolDefinition[] {
   return (Object.keys(chatToolSchemas) as ChatToolName[]).map((name) => ({
     name,
     description: TOOL_DESCRIPTIONS[name],
-    input_schema: z.toJSONSchema(chatToolSchemas[name], { io: 'input' }) as ToolDefinition['input_schema'],
+    // The server validates with the full zod schema; the model only needs the compact form of it.
+    input_schema: compactSchemaForModel(z.toJSONSchema(chatToolSchemas[name], { io: 'input' })) as ToolDefinition['input_schema'],
   }));
 }

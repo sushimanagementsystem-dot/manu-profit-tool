@@ -4,11 +4,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Problems } from '../common/problem';
 import type { AppConfig } from '../config/env.schema';
 import { InjectConfig } from '../config/config.module';
+import { withCacheBreakpoint } from './chat.compact';
 
 export type ChatTurn = Anthropic.Beta.Messages.BetaMessageParam;
 export type ChatResponse = Anthropic.Beta.Messages.BetaMessage;
 
-const MAX_TOKENS = 4096;
+/** Thinking and the answer share this budget; 4096 could be spent on thinking alone. */
+const MAX_TOKENS = 8192;
 /** Picks Anthropic's recommended substitute model when a safety classifier declines a request. */
 const FALLBACK_BETA = 'server-side-fallback-2026-07-01';
 
@@ -47,13 +49,18 @@ export class ClaudeClient {
         fallbacks: 'default',
         system: options.system,
         tools: options.tools,
-        messages: options.messages,
+        // The breakpoint is applied to a copy, so the stored turns never carry it.
+        messages: withCacheBreakpoint(options.messages),
       });
 
       if (response.stop_reason === 'refusal') {
         throw Problems.aiUnavailable('The assistant could not answer that request. Try rephrasing it.');
       }
       this.logUsage(response.usage);
+      const answered = response.content.some((block) => block.type === 'text' || block.type === 'tool_use');
+      if (response.stop_reason === 'max_tokens' && !answered) {
+        throw Problems.aiUnavailable('The assistant ran out of room to answer. Try asking it more simply.');
+      }
       return response;
     } catch (error) {
       throw this.translate(error);
