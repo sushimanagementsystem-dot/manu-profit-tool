@@ -115,6 +115,14 @@ export type ResultsResponse = {
     itemsCosted: number;
     revenueCoveredPercent: string | null;
   };
+  /** The assumptions the figures were worked out with. Absent from older servers. */
+  assumptions?: {
+    vatRate: string | null;
+    vatRateDrink: string | null;
+    menuPricesIncludeVat: boolean;
+    priceBasis: "LATEST" | "WEIGHTED_AVG" | "MAX";
+    wastagePct: string;
+  };
   items: ResultItem[];
   issues: {
     code: string;

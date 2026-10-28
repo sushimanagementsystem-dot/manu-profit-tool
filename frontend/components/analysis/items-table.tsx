@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -45,14 +45,33 @@ const CLASS_HINTS: Record<NonNullable<ResultItem["matrixClass"]>, string> = {
 };
 
 const CLASS_STYLES: Record<NonNullable<ResultItem["matrixClass"]>, string> = {
-  STAR: "border-brand-line bg-brand-soft text-brand-ink",
-  PLOWHORSE: "border-warning-line bg-warning-soft text-warning",
-  PUZZLE: "border-border bg-muted text-foreground",
-  DOG: "border-destructive-line bg-destructive-soft text-destructive",
+  STAR: "bg-brand-soft text-brand-ink",
+  PLOWHORSE: "bg-info-soft text-info",
+  PUZZLE: "bg-violet-soft text-violet",
+  DOG: "bg-destructive-soft text-destructive",
 };
 
+/** Dish initial tiles take one of a few soft colours, the same for every dish of a category. */
+const MONOGRAMS = [
+  "bg-info-soft text-info",
+  "bg-brand-soft text-brand-ink",
+  "bg-warning-soft text-warning",
+  "bg-violet-soft text-violet",
+  "bg-destructive-soft text-destructive",
+];
+const monogramTone = (category: string | null) =>
+  MONOGRAMS[[...(category ?? "")].reduce((sum, char) => sum + char.charCodeAt(0), 0) % MONOGRAMS.length];
+
+/** Green from 70 % up, amber from 50 %, otherwise red: the same bands the owner reads GP % by. */
+const gpBarTone = (percent: number) =>
+  percent >= 70 ? "bg-brand" : percent >= 50 ? "bg-warning" : "bg-destructive";
+
 /** The item column stays in view while the figures scroll sideways on a phone. */
-const FROZEN = "sticky left-0 z-10 bg-card px-2 shadow-[1px_0_0_var(--border)]";
+const FROZEN = "sticky left-0 z-[1] bg-card px-2 shadow-[1px_0_0_var(--border)]";
+
+/** A body cell: fixed row height, a hairline under it, a soft hover. */
+const ROW = "h-[52px] border-b border-border/60 px-2 whitespace-nowrap bg-card group-hover/row:bg-[color-mix(in_oklab,var(--muted)_40%,var(--card))] group-[.is-updated]/row:bg-brand-soft";
+const FOOT = "h-[46px] border-t bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))] px-2";
 
 /** How long a row stays highlighted after an edit changed it. */
 const HIGHLIGHT_MS = 3000;
@@ -143,9 +162,12 @@ export function ItemsTable({
     onSave: (value: string) => save(item, field, value),
   });
 
+  const th = "sticky top-0 z-[1] bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))] px-2 py-2.5 whitespace-nowrap text-[11.5px] font-semibold tracking-[0.02em] text-muted-foreground";
+
   return (
-    <div aria-busy={busy} className="flex flex-col gap-3">
+    <div aria-busy={busy} className="flex flex-col">
       <TableToolbar
+        total={items.length}
         query={query}
         onQueryChange={setQuery}
         filter={filter}
@@ -154,20 +176,21 @@ export function ItemsTable({
         sort={sort}
         onSortChange={setSort}
       />
-      <div className="flex h-5 items-center justify-end gap-1.5 px-2 text-xs text-muted-foreground" aria-live="polite">
-        {busy ? (
-          <>
+      <div className="sr-only" aria-live="polite">
+        {busy
+          ? "Recalculating"
+          : changedNames.length > 0 && `Figures updated for ${changedNames.join(", ")}.`}
+      </div>
+      <div className="relative overflow-x-auto border-t">
+        {busy && (
+          <span className="absolute top-2 right-3 z-[2] inline-flex items-center gap-1.5 rounded-full bg-card/90 px-2 py-0.5 text-xs text-muted-foreground shadow-sm">
             <Loader2 className="size-3 animate-spin" aria-hidden />
             Recalculating…
-          </>
-        ) : (
-          changedNames.length > 0 && <span className="sr-only">Figures updated for {changedNames.join(", ")}.</span>
+          </span>
         )}
-      </div>
-      <div className="-mx-2 overflow-x-auto">
         <table
           className={cn(
-            "w-full min-w-[58rem] border-collapse text-sm tabular-nums transition-opacity",
+            "w-full min-w-[56rem] border-separate border-spacing-0 text-[13.5px] tabular-nums transition-opacity",
             busy && "opacity-60",
           )}
         >
@@ -176,122 +199,198 @@ export function ItemsTable({
             prices and costs can be edited.
           </caption>
           <thead>
-            <tr className="border-b text-xs text-muted-foreground">
-              <th scope="col" className={cn(FROZEN, "py-2 text-left font-medium")}>
+            <tr>
+              <th scope="col" className={cn(th, FROZEN, "bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))] text-left")}>
                 Item
               </th>
-              <th scope="col" className="px-2 py-2 text-right font-medium">
+              <th scope="col" className={cn(th, "text-right", sort === "sold" && "text-foreground")}>
                 Sold
               </th>
-              <th scope="col" className="px-2 py-2 text-right font-medium" title="The price on your menu">
+              <th scope="col" className={cn(th, "text-right")} title="The price on your menu">
                 Menu price
               </th>
-              <th scope="col" className="px-2 py-2 text-right font-medium" title="Menu price without VAT">
+              <th scope="col" className={cn(th, "text-right")} title="Menu price without VAT">
                 Net price
               </th>
-              <th scope="col" className="px-2 py-2 text-right font-medium">
+              <th scope="col" className={cn(th, "text-right")}>
                 Cost
               </th>
-              <th scope="col" className="px-2 py-2 text-right font-medium">
+              <th scope="col" className={cn(th, "text-right")} title="Net price minus cost, per portion">
                 GP / portion
               </th>
-              <th scope="col" className="px-2 py-2 text-right font-medium">
+              <th scope="col" className={cn(th, "text-right", sort === "gp-percent" && "text-foreground")}>
                 GP %
               </th>
-              <th scope="col" className="px-2 py-2 text-right font-medium" title="Net price times units sold">
+              <th scope="col" className={cn(th, "text-right", sort === "revenue" && "text-foreground")} title="Net price times units sold">
                 Revenue
               </th>
-              <th scope="col" className="px-2 py-2 text-left font-medium">
+              <th scope="col" className={cn(th, "text-left")}>
                 Class
               </th>
             </tr>
           </thead>
           <tbody>
-            {shown.map((item) => (
-              <tr
-                key={item.menuItemId}
-                id={itemRowId(item.menuItemId)}
-                className={cn(
-                  "scroll-mt-24 border-b transition-colors duration-700 last:border-0",
-                  changed.includes(item.menuItemId) && "bg-brand-soft",
-                )}
-              >
-                <th scope="row" className={cn(FROZEN, "py-1.5 text-left font-medium", changed.includes(item.menuItemId) && "bg-brand-soft")}>
-                  <EditableCell
-                    {...cell(item, "name")}
-                    label={`name of ${item.name}`}
-                    kind="text"
-                    align="left"
-                  >
-                    {item.name}
-                  </EditableCell>
-                </th>
-                <td className="px-2 py-1.5 text-right">
-                  <EditableCell
-                    {...cell(item, "unitsSold")}
-                    label={`units sold of ${item.name}`}
-                    kind="decimal"
-                    align="right"
-                  >
-                    {formatNumber(item.unitsSold)}
-                  </EditableCell>
-                </td>
-                <td className="px-2 py-1.5 text-right">
-                  <EditableCell
-                    {...cell(item, "grossPrice")}
-                    label={`menu price of ${item.name}`}
-                    kind="decimal"
-                    align="right"
-                  >
-                    {formatMoney(item.grossPrice, currency)}
-                  </EditableCell>
-                </td>
-                <MetricCell metric={item.netPrice} format={(v) => formatMoney(v, currency)} />
-                <td
-                  className={cn(
-                    "px-2 py-1.5 text-right",
-                    isEstimate(item.costPerPortion) && "text-muted-foreground",
-                  )}
-                  title={item.costPerPortion.reasons.length > 0 ? item.costPerPortion.reasons.join(" ") : undefined}
+            {shown.map((item) => {
+              const updated = changed.includes(item.menuItemId);
+              const gp = item.gpPercent.value === null ? null : Number(item.gpPercent.value);
+              return (
+                <tr
+                  key={item.menuItemId}
+                  id={itemRowId(item.menuItemId)}
+                  className={cn("group/row scroll-mt-24 transition-colors duration-700", updated && "is-updated")}
                 >
-                  <EditableCell
-                    {...cell(item, "cost")}
-                    label={`cost per portion of ${item.name}`}
-                    kind="decimal"
-                    align="right"
-                    placeholder="empty = use recipe"
+                  <th
+                    scope="row"
+                    className={cn(
+                      ROW,
+                      FROZEN,
+                      "text-left font-medium max-sm:max-w-[9.5rem] max-sm:whitespace-normal group-hover/row:bg-[color-mix(in_oklab,var(--muted)_40%,var(--card))]",
+                      updated && "bg-brand-soft shadow-[inset_3px_0_0_var(--brand),1px_0_0_var(--border)]",
+                    )}
                   >
-                    {item.costPerPortion.value === null ? (
-                      <span className="text-xs font-medium text-brand-ink">+ Add cost</span>
-                    ) : (
-                      formatMoney(item.costPerPortion.value, currency)
-                    )}
-                    {item.costSource === "MANUAL" && (
-                      <span className="ml-1 text-xs italic text-muted-foreground">set</span>
-                    )}
-                    {isEstimate(item.costPerPortion) && <span className="ml-1 text-xs italic">est.</span>}
-                  </EditableCell>
-                </td>
-                <MetricCell metric={item.gpPerPortion} format={(v) => formatMoney(v, currency)} />
-                <MetricCell metric={item.gpPercent} format={formatPercent} />
-                <MetricCell metric={item.netRevenue} format={(v) => formatMoney(v, currency)} />
-                <td className="px-2 py-1.5 text-left">
-                  {item.matrixClass ? (
-                    <span
-                      title={CLASS_HINTS[item.matrixClass]}
-                      className={cn(
-                        "inline-block rounded-full border px-2 py-0.5 text-xs font-medium",
-                        CLASS_STYLES[item.matrixClass],
-                      )}
+                    <div className="flex min-w-[7.25rem] items-center gap-2.5 sm:min-w-[9rem]">
+                      <span
+                        className={cn(
+                          "grid size-7 shrink-0 place-items-center rounded-[9px] text-[13px] font-semibold max-sm:hidden",
+                          monogramTone(item.category),
+                        )}
+                        aria-hidden
+                      >
+                        {item.name.trim().charAt(0).toUpperCase()}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="flex items-center">
+                          <EditableCell
+                            {...cell(item, "name")}
+                            label={`name of ${item.name}`}
+                            kind="text"
+                            align="left"
+                          >
+                            {item.name}
+                          </EditableCell>
+                          {updated && (
+                            <span className="ml-1.5 rounded-md bg-brand-soft px-1.5 py-px text-[10.5px] font-bold tracking-wide text-brand-ink uppercase">
+                              Updated
+                            </span>
+                          )}
+                        </div>
+                        {item.category && (
+                          <span className="block text-[11.5px] font-normal text-muted-foreground">
+                            {item.category}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </th>
+                  <td className={cn(ROW, "text-right", updated && "bg-brand-soft")}>
+                    <EditableCell
+                      {...cell(item, "unitsSold")}
+                      label={`units sold of ${item.name}`}
+                      kind="decimal"
+                      align="right"
                     >
-                      {CLASS_LABELS[item.matrixClass]}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </td>
-              </tr>
-            ))}
+                      {formatNumber(item.unitsSold)}
+                    </EditableCell>
+                  </td>
+                  <td className={cn(ROW, "text-right", updated && "bg-brand-soft")}>
+                    <EditableCell
+                      {...cell(item, "grossPrice")}
+                      label={`menu price of ${item.name}`}
+                      kind="decimal"
+                      align="right"
+                    >
+                      {formatMoney(item.grossPrice, currency)}
+                    </EditableCell>
+                  </td>
+                  <MetricCell
+                    metric={item.netPrice}
+                    format={(v) => formatMoney(v, currency)}
+                    className={updated ? "bg-brand-soft" : undefined}
+                  />
+                  <td
+                    className={cn(
+                      ROW,
+                      "text-right",
+                      updated && "bg-brand-soft",
+                      isEstimate(item.costPerPortion) && "text-muted-foreground",
+                    )}
+                    title={item.costPerPortion.reasons.length > 0 ? item.costPerPortion.reasons.join(" ") : undefined}
+                  >
+                    <EditableCell
+                      {...cell(item, "cost")}
+                      label={`cost per portion of ${item.name}`}
+                      kind="decimal"
+                      align="right"
+                      placeholder="empty = use recipe"
+                      plain={item.costPerPortion.value === null}
+                    >
+                      {item.costPerPortion.value === null ? (
+                        <span className="inline-flex items-center gap-1 rounded-lg border border-dashed px-2 py-1 text-[12.5px] font-semibold text-warning hover:border-warning-line hover:bg-warning-soft">
+                          <Plus className="size-3" aria-hidden />
+                          Add cost
+                        </span>
+                      ) : (
+                        formatMoney(item.costPerPortion.value, currency)
+                      )}
+                      {item.costSource === "MANUAL" && (
+                        <span className="ml-1 text-[11px] italic text-muted-foreground">set</span>
+                      )}
+                      {isEstimate(item.costPerPortion) && <span className="ml-1 text-[11px] italic">est.</span>}
+                    </EditableCell>
+                  </td>
+                  <MetricCell
+                    metric={item.gpPerPortion}
+                    format={(v) => formatMoney(v, currency)}
+                    className={updated ? "bg-brand-soft" : undefined}
+                  />
+                  <td
+                    className={cn(ROW, "text-right", updated && "bg-brand-soft", isEstimate(item.gpPercent) && "text-muted-foreground")}
+                    title={item.gpPercent.reasons.length > 0 ? item.gpPercent.reasons.join(" ") : undefined}
+                  >
+                    {gp === null ? (
+                      <span className="text-muted-foreground/60">—</span>
+                    ) : (
+                      <span className="inline-flex items-center justify-end gap-2">
+                        <span className="h-[5px] w-[30px] overflow-hidden rounded-full bg-muted" aria-hidden>
+                          <span
+                            className={cn("block h-full rounded-full", gpBarTone(gp))}
+                            style={{ width: `${Math.min(100, Math.max(0, gp))}%` }}
+                          />
+                        </span>
+                        {formatPercent(item.gpPercent.value)}
+                        {isEstimate(item.gpPercent) && <span className="text-[11px] italic">est.</span>}
+                      </span>
+                    )}
+                  </td>
+                  <MetricCell
+                    metric={item.netRevenue}
+                    format={(v) => formatMoney(v, currency)}
+                    className={updated ? "bg-brand-soft" : undefined}
+                  />
+                  <td className={cn(ROW, "text-left", updated && "bg-brand-soft")}>
+                    {item.matrixClass ? (
+                      <span
+                        title={CLASS_HINTS[item.matrixClass]}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold",
+                          CLASS_STYLES[item.matrixClass],
+                        )}
+                      >
+                        <span className="size-1.5 rounded-full bg-current" aria-hidden />
+                        {CLASS_LABELS[item.matrixClass]}
+                      </span>
+                    ) : item.costPerPortion.value === null ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-soft px-2.5 py-0.5 text-[11.5px] font-semibold text-warning">
+                        <span className="size-1.5 rounded-full bg-current" aria-hidden />
+                        Needs a cost
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground/60">—</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
             {shown.length === 0 && (
               <tr>
                 <td colSpan={9} className="px-2 py-8 text-center text-muted-foreground">
@@ -302,25 +401,26 @@ export function ItemsTable({
           </tbody>
           {shown.length > 0 && (
             <tfoot>
-              <tr className="border-t-2 text-sm font-semibold">
-                <th scope="row" className={cn(FROZEN, "py-2 text-left")}>
+              <tr className="text-[13px] font-semibold">
+                <th scope="row" className={cn(FOOT, FROZEN, "bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))] text-left text-foreground/70")}>
                   {shown.length === items.length ? "Total" : `Total of ${shown.length} shown`}
                 </th>
-                <td className="px-2 py-2 text-right">{formatNumber(sums.unitsSold)}</td>
-                <td colSpan={5} />
-                <td className="px-2 py-2 text-right">{formatMoney(sums.netRevenue, currency)}</td>
-                <td />
+                <td className={cn(FOOT, "text-right")}>{formatNumber(sums.unitsSold)}</td>
+                <td colSpan={5} className={FOOT} />
+                <td className={cn(FOOT, "text-right")}>{formatMoney(sums.netRevenue, currency)}</td>
+                <td className={FOOT} />
               </tr>
             </tfoot>
           )}
         </table>
       </div>
-      <p className="px-2 text-xs text-muted-foreground">
-        Click a name, units sold, menu price or cost to edit it. Everything is recalculated and the
-        Excel file follows. Leave a cost empty to go back to the recipe. A dash means the figure
-        could not be worked out yet, not zero. <span className="italic">est.</span> marks an
-        estimate and <span className="italic">set</span> a cost you entered — hover to see why.
-        Totals cover the rows shown.
+      <p className="flex flex-wrap gap-x-4 gap-y-1 border-t px-[18px] py-3 text-xs text-muted-foreground">
+        <span>Click a name, units sold, menu price or cost to edit it. Everything is recalculated and the Excel file follows.</span>
+        <span>
+          <b className="font-semibold text-foreground/70">—</b> not worked out yet, not zero ·{" "}
+          <i>est.</i> an estimate · <i>set</i> a cost you entered · empty cost = back to the recipe · totals
+          cover the rows shown
+        </span>
       </p>
     </div>
   );
@@ -330,19 +430,22 @@ export function ItemsTable({
 function MetricCell({
   metric,
   format,
+  className,
 }: {
   metric: Metric;
   format: (value: string | null) => string;
+  className?: string;
 }) {
   const estimate = isEstimate(metric);
+  const unknown = metric.value === null;
 
   return (
     <td
-      className={cn("px-2 py-1.5 text-right", estimate && "text-muted-foreground")}
+      className={cn(ROW, "text-right", estimate && "text-muted-foreground", className)}
       title={metric.reasons.length > 0 ? metric.reasons.join(" ") : undefined}
     >
-      {format(metric.value)}
-      {estimate && <span className="ml-1 text-xs italic">est.</span>}
+      {unknown ? <span className="text-muted-foreground/60">—</span> : format(metric.value)}
+      {estimate && <span className="ml-1 text-[11px] italic">est.</span>}
     </td>
   );
 }

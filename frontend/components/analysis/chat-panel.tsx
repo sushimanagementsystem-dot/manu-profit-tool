@@ -7,7 +7,8 @@ import { toast } from "sonner";
 
 import { ProposalCard } from "@/components/analysis/proposal-card";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { AiCostLine } from "@/components/analysis/ai-cost-line";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ApiError, api } from "@/lib/api/client";
 import type { ChatMessage, ImpactPreview } from "@/lib/api/types";
@@ -97,92 +98,98 @@ export function ChatPanel({
   const pendingQuestion = send.isPending ? send.variables : null;
 
   return (
-    <Card className={cn("w-full", fill && "h-full min-h-0")}>
-      <CardContent className={cn("flex flex-col gap-4", fill && "h-full min-h-0")}>
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <Sparkles className="size-4 text-brand" aria-hidden />
-            <h2 className="text-sm font-semibold">Ask or correct</h2>
-            {waiting > 0 && (
-              <span className="ml-auto rounded-full border border-warning-line bg-warning-soft px-2 py-0.5 text-xs font-medium text-warning">
-                {waiting} waiting for your OK
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Ask about your figures, or describe what is wrong. Changes are shown first and only
-            applied when you say so.
-          </p>
+    <Card className={cn("w-full gap-0 overflow-hidden py-0 shadow-sm", fill && "h-full min-h-0")}>
+      <div className="flex items-center gap-2.5 border-b px-4 py-3.5">
+        <span
+          className="grid size-[34px] shrink-0 place-items-center rounded-[10px] bg-gradient-to-br from-brand/70 to-brand text-brand-foreground"
+          aria-hidden
+        >
+          <Sparkles className="size-[18px]" />
+        </span>
+        <div className="min-w-0">
+          <h2 className="text-[15px] leading-tight font-semibold">Assistant</h2>
+          <p className="text-xs text-muted-foreground">Answers come from your analysis</p>
         </div>
-
-        {disabled ? (
-          <p className="text-sm text-muted-foreground">
-            The assistant becomes available once the analysis is ready.
-          </p>
+        {waiting > 0 ? (
+          <span className="ml-auto rounded-full border border-warning-line bg-warning-soft px-2.5 py-0.5 text-[11.5px] font-semibold whitespace-nowrap text-warning">
+            {waiting} waiting for your OK
+          </span>
         ) : (
-          <>
-            <div
-              className={cn(
-                "flex flex-col gap-3 overflow-y-auto",
-                fill ? "min-h-0 flex-1" : "max-h-[26rem]",
-              )}
-            >
-              {messages.length === 0 && !pendingQuestion && (
-                <p className="text-sm text-muted-foreground">
-                  Ask about your results, or tell me what is wrong — for example &ldquo;the burger
-                  is €14.50, not €12&rdquo; or &ldquo;a burger uses 180g of beef&rdquo;. I will
-                  prepare the change for you to confirm.
-                </p>
-              )}
+          <span className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-brand-soft px-2.5 py-0.5 text-[11.5px] font-semibold text-brand-ink">
+            <span className="size-1.5 rounded-full bg-brand" aria-hidden />
+            Ready
+          </span>
+        )}
+      </div>
 
-              {messages.map((message) => (
-                <Bubble key={message.id} message={message}>
-                  {message.proposal && (
-                    <ProposalCard
-                      proposal={message.proposal}
-                      impact={impacts[message.proposal.revisionId] ?? null}
-                      currency={currency}
-                      pending={decide.isPending && decide.variables?.revisionId === message.proposal.revisionId}
-                      onConfirm={() =>
-                        decide.mutate({ revisionId: message.proposal!.revisionId, approve: true })
-                      }
-                      onCancel={() =>
-                        decide.mutate({ revisionId: message.proposal!.revisionId, approve: false })
-                      }
-                    />
-                  )}
-                </Bubble>
+      {disabled ? (
+        <p className="p-4 text-sm text-muted-foreground">
+          The assistant becomes available once the analysis is ready.
+        </p>
+      ) : (
+        <>
+          <div
+            className={cn(
+              "flex flex-col gap-3 overflow-y-auto px-4 py-3.5",
+              fill ? "min-h-0 flex-1" : "max-h-[26rem]",
+            )}
+          >
+            <div className="flex flex-wrap gap-1.5">
+              {SUGGESTIONS.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  onClick={() => submit(suggestion)}
+                  disabled={send.isPending}
+                  className="cursor-pointer rounded-full border bg-card px-3 py-1.5 text-left text-[12.5px] text-foreground/70 transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {suggestion}
+                </button>
               ))}
-
-              {pendingQuestion && (
-                <>
-                  <Bubble message={{ role: "USER", content: pendingQuestion } as ChatMessage} />
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="size-3.5 animate-spin" />
-                    Looking at your analysis…
-                  </div>
-                </>
-              )}
-              <div ref={endRef} />
             </div>
 
             {messages.length === 0 && !pendingQuestion && (
-              <div className="flex flex-wrap gap-2">
-                {SUGGESTIONS.map((suggestion) => (
-                  <button
-                    key={suggestion}
-                    type="button"
-                    onClick={() => submit(suggestion)}
-                    className="cursor-pointer rounded-full border px-3 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted"
-                  >
-                    {suggestion}
-                  </button>
-                ))}
-              </div>
+              <p className="text-[13px] text-muted-foreground">
+                Ask about your results, or tell me what is wrong — for example &ldquo;the burger is
+                &euro;14.50, not &euro;12&rdquo; or &ldquo;a burger uses 180g of beef&rdquo;. I will
+                prepare the change and show it to you first; it is only applied when you say so.
+              </p>
             )}
 
+            {messages.map((message) => (
+              <Message key={message.id} message={message}>
+                {message.proposal && (
+                  <ProposalCard
+                    proposal={message.proposal}
+                    impact={impacts[message.proposal.revisionId] ?? null}
+                    currency={currency}
+                    pending={decide.isPending && decide.variables?.revisionId === message.proposal.revisionId}
+                    onConfirm={() =>
+                      decide.mutate({ revisionId: message.proposal!.revisionId, approve: true })
+                    }
+                    onCancel={() =>
+                      decide.mutate({ revisionId: message.proposal!.revisionId, approve: false })
+                    }
+                  />
+                )}
+              </Message>
+            ))}
+
+            {pendingQuestion && (
+              <>
+                <Message message={{ role: "USER", content: pendingQuestion, createdAt: "" }} />
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="size-3.5 animate-spin" />
+                  Looking at your analysis…
+                </div>
+              </>
+            )}
+            <div ref={endRef} />
+          </div>
+
+          <div className="border-t bg-card px-3.5 py-3">
             <form
-              className="flex gap-2"
+              className="flex items-center gap-2 rounded-xl border bg-card py-[5px] pr-[5px] pl-3 focus-within:ring-3 focus-within:ring-ring/40"
               onSubmit={(event) => {
                 event.preventDefault();
                 submit(draft);
@@ -196,27 +203,35 @@ export function ChatPanel({
                 maxLength={2000}
                 disabled={send.isPending}
                 aria-label="Message to the assistant"
+                className="h-9 flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
               />
-              <Button type="submit" disabled={send.isPending || !draft.trim()} aria-label="Send">
-                {send.isPending ? (
-                  <Loader2 className="animate-spin" />
-                ) : (
-                  <SendHorizontal />
-                )}
+              <Button
+                type="submit"
+                size="icon"
+                disabled={send.isPending || !draft.trim()}
+                aria-label="Send"
+                className="size-9 rounded-[9px]"
+              >
+                {send.isPending ? <Loader2 className="animate-spin" /> : <SendHorizontal />}
               </Button>
             </form>
-          </>
-        )}
-      </CardContent>
+            <AiCostLine jobId={jobId} token={token} />
+          </div>
+        </>
+      )}
     </Card>
   );
 }
 
-function Bubble({
+/** "10:24", the time a message was written; nothing while it is still being sent. */
+const timeOf = (iso: string) =>
+  iso ? new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : "";
+
+function Message({
   message,
   children,
 }: {
-  message: Pick<ChatMessage, "role" | "content">;
+  message: Pick<ChatMessage, "role" | "content" | "createdAt">;
   children?: React.ReactNode;
 }) {
   const isUser = message.role === "USER";
@@ -224,11 +239,16 @@ function Bubble({
     <div className={cn("flex flex-col gap-2", isUser ? "items-end" : "items-start")}>
       <div
         className={cn(
-          "max-w-[85%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap",
-          isUser ? "bg-primary text-primary-foreground" : "bg-muted",
+          "max-w-[92%] rounded-[14px] px-3.5 py-2.5 text-[13.5px] leading-normal whitespace-pre-wrap",
+          isUser
+            ? "rounded-br-[5px] bg-foreground text-background"
+            : "rounded-bl-[5px] border bg-muted/50 text-foreground",
         )}
       >
         {message.content}
+        {!isUser && message.createdAt && (
+          <span className="mt-1.5 block text-[11px] text-muted-foreground">{timeOf(message.createdAt)}</span>
+        )}
       </div>
       {children && <div className="w-full">{children}</div>}
     </div>

@@ -6,7 +6,6 @@ import { Loader2 } from "lucide-react";
 
 import { AnalysisFooter } from "@/components/analysis/analysis-footer";
 import { AnalysisProgress } from "@/components/analysis/analysis-progress";
-import { AiCostCard } from "@/components/analysis/ai-cost-card";
 import { AnalysisSummary } from "@/components/analysis/analysis-summary";
 import { ChatPanel } from "@/components/analysis/chat-panel";
 import { AnalysisHeader } from "@/components/analysis/analysis-header";
@@ -112,20 +111,17 @@ export function AnalysisWorkspace({ jobId }: { jobId: string }) {
         revision={results.data?.revision ?? 0}
         incomplete={unread.length > 0}
       />
-      <div className="mx-auto grid w-full max-w-[1488px] items-start gap-6 px-4 py-6 sm:px-6 min-[1180px]:grid-cols-[minmax(0,1fr)_372px]">
-        <main id="figures" tabIndex={-1} className="flex min-w-0 flex-col gap-4 outline-none">
-          <h1 className="sr-only">Menu profit analysis</h1>
+      <div className="mx-auto grid w-full max-w-[1488px] items-start gap-6 px-3.5 py-6 sm:px-6 min-[1180px]:grid-cols-[minmax(0,1fr)_372px]">
+        <main id="figures" tabIndex={-1} className="flex min-w-0 flex-col gap-[18px] outline-none">
           <IncompleteBanner files={unread} />
           {results.data ? (
-            <>
-              <AnalysisSummary
-                results={results.data}
-                jobId={jobId}
-                token={token}
-                refreshing={results.isFetching}
-              />
-              <AiCostCard jobId={jobId} token={token} />
-            </>
+            <AnalysisSummary
+              results={results.data}
+              filesRead={status.data.files.filter((file) => file.status === "PROCESSED").length}
+              jobId={jobId}
+              token={token}
+              refreshing={results.isFetching}
+            />
           ) : (
             <CenteredNote icon>Loading your results…</CenteredNote>
           )}

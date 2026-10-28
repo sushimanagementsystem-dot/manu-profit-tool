@@ -100,11 +100,13 @@ None required for steps 3–8, except the optional assumptions field (question 2
 
 Built on the existing screen; no backend change. Final screenshots: `docs/screens/final/`.
 
-**Differences from the prototype, on purpose**
-- **Assumption chips (VAT, price basis) in the header: not built.** The results API does not return the assumptions; adding them is a small backend change and was left out of this frontend-only phase. Tracked as an open item.
-- **"Edited by you" filter became "Cost set by you":** the API only says whether a cost was entered by hand, not whether a name or units were edited.
-- **Table totals cover the menu rows shown**, so they are lower than the headline cards, which also include POS lines not matched to a menu item (the attention strip says so).
-- Proposal "before → after" item rows exist only in the session that created the proposal (the API does not return the impact again); unchanged from before this phase.
+**Prototype match pass (after the first build was judged not close enough).** Added: visible page title with "N files read · includes N confirmed changes" and a Ready pill; icon-tile KPI cards with their sub-lines (unlinked revenue and units are worked out as totals minus menu rows); the "N things need attention" box with severity chips and a Review button; the read-only "Calculated with" chips (VAT, price basis, wastage), which needed one additive backend field (`assumptions` on `GET /jobs/:id/results`, read live, not stored in the snapshot, no migration); the table card with title and count, dark active filter chip, category avatars and subtitles, GP % bars, class pills with dots, "Needs a cost" pills, dotted-underline editable cells, an "Updated" tag with an accent bar, and a tidied legend; issues and recommendations side by side; the assistant header with tile and Ready pill, suggestions on top, message times, a compact "Applied"/"Not applied" line, the "Waiting for your OK" card, and the AI-cost line (`AiCostLine`, replacing the separate card) under the message box.
+
+**Differences from the prototype that remain, on purpose**
+- **Brand green is deeper** (`#047857`-ish, not the prototype's `#059669`) so white text on it is 5.1:1 instead of 3.8:1.
+- **"Edited by you" filter is "Cost set by you":** the API only says whether a cost was entered by hand, not whether a name or units were edited.
+- **Table totals cover the menu rows shown**, so they are lower than the headline cards, which also include POS lines not matched to a menu item (the cards and the attention box say so).
+- **Proposal rows ("before to after") exist only in the session that created the proposal** (the API does not return the impact again); unchanged from before this phase. The prototype's per-operation rows (e.g. "Fish & Chips sold 290 to 300") are shown as profit-per-portion rows because the API does not return the operations.
 
 **Accessibility pass (step 8):** one `h1` (visually hidden), `header`/`main`/`aside` landmarks, skip link, logical Tab order, labelled controls, no duplicate ids, tap targets ≥ 24 px, reduced-motion respected for the smooth scrolls and the row flash, filter chips with a focus ring, and the brand colour deepened so white-on-brand text is 5.1:1 (it was 3.5:1). Checked at 1440 and 390 px; no page-level horizontal scroll.
 

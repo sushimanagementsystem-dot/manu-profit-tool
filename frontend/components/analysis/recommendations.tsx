@@ -14,12 +14,13 @@ type Recommendation = ResultsResponse["recommendations"][number];
 
 const TOP = 3;
 
-const KIND_LABELS: Record<string, string> = {
-  PRICE: "Price",
-  COST: "Cost",
-  MENU_MIX: "Menu mix",
-  DATA_QUALITY: "Data",
+const KINDS: Record<string, { label: string; tone: string }> = {
+  PRICE: { label: "Price", tone: "bg-brand-soft text-brand-ink" },
+  COST: { label: "Cost", tone: "bg-info-soft text-info" },
+  MENU_MIX: { label: "Menu mix", tone: "bg-violet-soft text-violet" },
+  DATA_QUALITY: { label: "Data", tone: "bg-warning-soft text-warning" },
 };
+const FALLBACK_KIND = { label: "Idea", tone: "bg-muted text-muted-foreground" };
 
 /**
  * The analysis's own suggestions, the same ones that go into the Excel workbook, most useful
@@ -46,11 +47,11 @@ export function Recommendations({
   }
 
   return (
-    <Card className="w-full">
+    <Card className="w-full shadow-sm">
       <CardContent className="flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <Lightbulb className="size-4 text-brand" aria-hidden />
-          <h2 className="text-sm font-semibold">Recommendations</h2>
+          <h2 className="text-base font-semibold tracking-tight">Recommendations</h2>
         </div>
         <ol className="flex flex-col divide-y">
           {visible.map((item) => (
@@ -58,18 +59,20 @@ export function Recommendations({
               key={`${item.priority}-${item.title}`}
               className="flex flex-col gap-1.5 py-3 first:pt-0 last:pb-0"
             >
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full border px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                  {KIND_LABELS[item.kind] ?? "Idea"}
+              <div className="flex flex-wrap items-start gap-2.5">
+                <span
+                  className={`mt-px rounded-md px-1.5 py-0.5 text-[10.5px] font-bold tracking-wider uppercase ${(KINDS[item.kind] ?? FALLBACK_KIND).tone}`}
+                >
+                  {(KINDS[item.kind] ?? FALLBACK_KIND).label}
                 </span>
-                <p className="text-sm font-medium">{item.title}</p>
+                <p className="min-w-0 flex-1 text-[13.5px] leading-snug font-semibold">{item.title}</p>
                 {item.impactGp && (
-                  <span className="ml-auto text-xs font-medium whitespace-nowrap text-brand-ink">
+                  <span className="ml-auto text-[12.5px] font-semibold whitespace-nowrap text-brand-ink">
                     about +{formatMoney(item.impactGp, currency)} gross profit
                   </span>
                 )}
               </div>
-              <p className="text-sm text-muted-foreground">{item.body}</p>
+              <p className="text-[12.5px] text-muted-foreground">{item.body}</p>
               {item.menuItemId && (
                 <div>
                   <Button

@@ -36,13 +36,13 @@ export function AnalysisFooter({
   });
 
   return (
-    <div className="flex w-full flex-col gap-3 border-t pt-4 text-sm">
+    <div className="flex w-full flex-wrap items-center gap-3 px-0.5 pb-6 text-[12.5px]">
       <p className="text-muted-foreground">
         This analysis and its files are deleted automatically{" "}
         <span className="font-medium text-foreground">{formatTimeLeft(expiresAt)}</span>. Anyone
         with the link can open it until then.
       </p>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1.5 sm:ml-auto">
         {confirming ? (
           <>
             <Button
@@ -68,7 +68,7 @@ export function AnalysisFooter({
             variant="ghost"
             size="sm"
             onClick={() => setConfirming(true)}
-            className="gap-1.5 text-muted-foreground"
+            className="gap-1.5 text-destructive hover:bg-destructive-soft hover:text-destructive"
           >
             <Trash2 className="size-3.5" />
             Delete now

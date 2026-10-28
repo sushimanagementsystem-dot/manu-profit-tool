@@ -16,6 +16,8 @@ type EditableCellProps = {
   /** "text" for a name; "decimal" brings up the number pad on a phone. */
   kind: "text" | "decimal";
   placeholder?: string;
+  /** No dotted underline: the content is already a button of its own ("Add cost"). */
+  plain?: boolean;
   align: "left" | "right";
   /** Open or closed is owned by the table, so only one cell is ever being edited. */
   editing: boolean;
@@ -38,6 +40,7 @@ export function EditableCell({
   startValue,
   kind,
   placeholder,
+  plain = false,
   align,
   editing,
   onEditingChange,
@@ -114,15 +117,20 @@ export function EditableCell({
         disabled={disabled}
         aria-label={`Edit ${label}`}
         className={cn(
-          "group inline-flex w-full items-center gap-1.5 rounded-sm px-1 py-0.5 -mx-1 text-inherit transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:outline-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-60",
+          "group inline-flex items-center gap-1 rounded-none text-inherit transition-colors focus-visible:outline-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-60",
+          plain
+            ? "py-0.5"
+            : "-mx-[7px] min-w-[52px] border-b border-dotted border-muted-foreground/50 px-[7px] py-[5px] hover:rounded-lg hover:border-transparent hover:bg-muted focus-visible:rounded-lg focus-visible:bg-muted",
           align === "right" ? "justify-end text-right" : "justify-start text-left",
         )}
       >
         <span>{children}</span>
-        <Pencil
-          aria-hidden
-          className="size-3 shrink-0 text-muted-foreground opacity-40 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-        />
+        {!plain && (
+          <Pencil
+            aria-hidden
+            className="size-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+          />
+        )}
       </button>
     );
   }
@@ -165,7 +173,7 @@ export function EditableCell({
           disabled={saving}
           aria-label={`Save ${label}`}
           title="Save (Enter)"
-          className="text-emerald-600"
+          className="text-brand-ink"
         >
           {saving ? <Loader2 className="animate-spin" /> : <Check />}
         </Button>

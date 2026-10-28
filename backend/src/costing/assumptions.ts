@@ -50,3 +50,23 @@ export function toEngineAssumptions(stored: { key: string; value: unknown }[]): 
     wastagePct: decimalOrNull(values.WASTAGE_PCT) ?? new Decimal(0),
   };
 }
+
+/** What the client sees of the assumptions behind the figures: VAT rates as fractions, wastage as a fraction. */
+export type AssumptionsJson = {
+  vatRate: string | null;
+  vatRateDrink: string | null;
+  menuPricesIncludeVat: boolean;
+  priceBasis: PriceBasis;
+  wastagePct: string;
+};
+
+export function toAssumptionsJson(stored: { key: string; value: unknown }[]): AssumptionsJson {
+  const assumptions = toEngineAssumptions(stored);
+  return {
+    vatRate: assumptions.vatRate?.toString() ?? null,
+    vatRateDrink: assumptions.vatRateDrink?.toString() ?? null,
+    menuPricesIncludeVat: assumptions.menuPricesIncludeVat,
+    priceBasis: assumptions.priceBasis,
+    wastagePct: assumptions.wastagePct.toString(),
+  };
+}

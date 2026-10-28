@@ -1,45 +1,107 @@
+import { CircleDollarSign, Gauge, TrendingUp, UtensilsCrossed } from "lucide-react";
+
 import { Card, CardContent } from "@/components/ui/card";
-import type { ResultsResponse } from "@/lib/api/types";
-import { cn } from "@/lib/utils";
+import type { ResultItem, ResultsResponse } from "@/lib/api/types";
+import { unlinkedSales } from "@/lib/audit/figures";
 import { formatMoney, formatNumber, formatPercent } from "@/lib/format";
+import { cn } from "@/lib/utils";
+
+type Tone = "green" | "blue" | "violet" | "amber";
+
+const TONES: Record<Tone, string> = {
+  green: "bg-brand-soft text-brand-ink",
+  blue: "bg-info-soft text-info",
+  violet: "bg-violet-soft text-violet",
+  amber: "bg-warning-soft text-warning",
+};
 
 /**
- * The four headline figures. Gross profit is the hero (brand colour) because it is the number the
- * client came for; cost coverage sits last with a meter, since every other figure is only as
- * complete as it is.
+ * The four headline figures. Gross profit is the hero because it is the number the client came
+ * for; cost coverage sits last with a meter, since every other figure is only as complete as it
+ * is. Each card says what its figure leaves out, so the totals can be trusted or questioned.
  */
 export function SummaryCards({
   summary,
+  items,
   currency,
   refreshing,
 }: {
   summary: ResultsResponse["summary"];
+  items: ResultItem[];
   currency: string;
   /** The figures are being recalculated after a change. */
   refreshing: boolean;
 }) {
   const coverage = Math.min(100, Math.max(0, Number(summary.revenueCoveredPercent ?? 0)));
   const complete = summary.itemsTotal > 0 && summary.itemsCosted === summary.itemsTotal;
+  const missing = summary.itemsTotal - summary.itemsCosted;
+  const unlinked = unlinkedSales(summary, items);
 
   return (
     <dl
       className={cn(
-        "grid grid-cols-2 gap-3 transition-opacity xl:grid-cols-4",
+        "grid grid-cols-2 gap-3.5 transition-opacity xl:grid-cols-4",
         refreshing && "opacity-60",
       )}
     >
-      <Stat label="Net revenue" value={formatMoney(summary.netRevenue, currency)} />
-      <Stat label="Items sold" value={formatNumber(summary.unitsSold)} />
       <Stat
-        label="Gross profit"
-        value={formatMoney(summary.realisedGp, currency)}
-        hint={`${formatPercent(summary.gpPercent)} of net revenue`}
-        hero
+        icon={<TrendingUp />}
+        tone="green"
+        label="Net revenue"
+        value={formatMoney(summary.netRevenue, currency)}
+        hint={
+          unlinked.revenue > 0 ? (
+            <>
+              <b>{formatMoney(String(unlinked.revenue), currency)}</b> of it is not linked to a
+              menu item yet
+            </>
+          ) : (
+            "Sales without VAT"
+          )
+        }
       />
       <Stat
+        icon={<UtensilsCrossed />}
+        tone="blue"
+        label="Items sold"
+        value={formatNumber(summary.unitsSold)}
+        hint={
+          <>
+            {summary.itemsTotal} menu items
+            {unlinked.units > 0 && (
+              <>
+                {" "}
+                · <b>{formatNumber(String(unlinked.units))}</b> sold but not linked
+              </>
+            )}
+          </>
+        }
+      />
+      <Stat
+        icon={<CircleDollarSign />}
+        tone="green"
+        hero
+        label="Gross profit"
+        badge={formatPercent(summary.gpPercent)}
+        value={formatMoney(summary.realisedGp, currency)}
+        hint={
+          <>
+            On the <b>{summary.itemsCosted} of {summary.itemsTotal}</b> dishes with a cost
+          </>
+        }
+      />
+      <Stat
+        icon={<Gauge />}
+        tone="amber"
         label="Cost coverage"
-        value={`${summary.itemsCosted} of ${summary.itemsTotal}`}
-        hint={`${formatPercent(summary.revenueCoveredPercent)} of revenue`}
+        value={String(summary.itemsCosted)}
+        valueSuffix={`of ${summary.itemsTotal} dishes`}
+        hint={
+          <>
+            <b>{formatPercent(summary.revenueCoveredPercent)}</b> of revenue
+            {missing > 0 && ` · ${missing} ${missing === 1 ? "dish needs" : "dishes still need"} a cost`}
+          </>
+        }
       >
         <div
           role="meter"
@@ -47,10 +109,13 @@ export function SummaryCards({
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={Math.round(coverage)}
-          className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"
+          className="mt-2 h-[7px] overflow-hidden rounded-full bg-muted"
         >
           <div
-            className={cn("h-full rounded-full", complete ? "bg-brand" : "bg-warning")}
+            className={cn(
+              "h-full rounded-full",
+              complete ? "bg-brand" : "bg-gradient-to-r from-warning/70 to-warning",
+            )}
             style={{ width: `${coverage}%` }}
           />
         </div>
@@ -60,39 +125,57 @@ export function SummaryCards({
 }
 
 function Stat({
+  icon,
+  tone,
   label,
+  badge,
   value,
+  valueSuffix,
   hint,
   hero = false,
   children,
 }: {
+  icon: React.ReactNode;
+  tone: Tone;
   label: string;
+  badge?: string;
   value: string;
-  hint?: string;
+  valueSuffix?: string;
+  hint: React.ReactNode;
   hero?: boolean;
   children?: React.ReactNode;
 }) {
   return (
-    <Card className={cn("w-full", hero && "border-brand-line bg-brand-soft")}>
+    <Card className={cn("w-full shadow-sm", hero && "border-brand-line bg-gradient-to-b from-brand-soft to-card")}>
       <CardContent className="flex flex-col gap-1">
-        <dt className={cn("text-xs font-medium", hero ? "text-brand-ink" : "text-muted-foreground")}>
-          {label}
-        </dt>
-        <dd className="m-0 flex flex-col">
+        <dt className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px] font-medium text-muted-foreground">
           <span
             className={cn(
-              "text-2xl font-semibold tabular-nums tracking-tight",
-              hero && "text-brand-ink",
+              "grid size-[30px] shrink-0 place-items-center rounded-[9px] [&_svg]:size-4",
+              TONES[tone],
             )}
+            aria-hidden
           >
-            {value}
+            {icon}
           </span>
-          {hint && (
-            <span className={cn("text-xs", hero ? "text-brand-ink" : "text-muted-foreground")}>
-              {hint}
+          {label}
+          {badge && (
+            <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[11.5px] font-semibold text-brand-ink">
+              {badge}
             </span>
           )}
+        </dt>
+        <dd className="m-0 flex flex-col">
+          <span className="mt-1.5 text-[22px] leading-[1.1] sm:text-[28px] font-semibold tracking-tight tabular-nums">
+            {value}
+            {valueSuffix && (
+              <span className="ml-1.5 text-base font-medium text-muted-foreground">{valueSuffix}</span>
+            )}
+          </span>
           {children}
+          <span className="mt-1 text-[12.5px] text-muted-foreground [&_b]:font-semibold [&_b]:text-foreground/80">
+            {hint}
+          </span>
         </dd>
       </CardContent>
     </Card>
