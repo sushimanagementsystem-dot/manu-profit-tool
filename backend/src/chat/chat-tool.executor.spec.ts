@@ -128,5 +128,6 @@ describe('CHAT_SYSTEM_PROMPT', () => {
     expect(CHAT_SYSTEM_PROMPT).toMatch(/never invent an id/i);
     expect(CHAT_SYSTEM_PROMPT).toMatch(/independent tools together/i);
     expect(CHAT_SYSTEM_PROMPT).toMatch(/only when a wrong guess/i);
+    expect(CHAT_SYSTEM_PROMPT).toMatch(/greeting or small talk/i);
   });
 });
