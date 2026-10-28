@@ -3,6 +3,7 @@ import { Problems } from '../common/problem';
 import { ASSUMPTION_VALUE_SCHEMAS } from '../costing/assumptions';
 import type { Db } from '../costing/engine-input.loader';
 import { normalizeName } from '../normalization/names';
+import { scaleSales, totalSold } from './sales-scaling';
 import { toBaseQuantity } from '../normalization/units';
 import type { Operation } from './operations.schema';
 
@@ -31,6 +32,68 @@ export async function applyOperation(
         description: `Selling price of ${item.name} set to ${grossPrice.toFixed(2)}`,
         before: item.grossPrice?.toString() ?? null,
         after: grossPrice.toString(),
+      };
+    }
+
+    case 'RENAME_MENU_ITEM': {
+      const item = await findMenuItem(db, jobId, operation.menuItemId);
+      const normalizedName = normalizeName(operation.name);
+      const clash = await db.menuItem.findFirst({
+        where: { jobId, normalizedName, NOT: { id: item.id } },
+        select: { name: true },
+      });
+      if (clash) throw Problems.validation(`"${clash.name}" is already on the menu.`);
+      if (operation.name === item.name) throw Problems.validation(`${item.name} already has that name.`);
+      await db.menuItem.update({ where: { id: item.id }, data: { name: operation.name, normalizedName } });
+      return {
+        description: `${item.name} renamed to ${operation.name}`,
+        before: item.name,
+        after: operation.name,
+      };
+    }
+
+    case 'SET_UNITS_SOLD': {
+      const item = await findMenuItem(db, jobId, operation.menuItemId);
+      const lines = await db.posSalesLine.findMany({
+        where: { jobId, menuItemId: item.id, isDuplicate: false },
+        orderBy: { id: 'asc' },
+      });
+      if (!lines.length) {
+        throw Problems.validation(
+          `${item.name} has no POS sales linked to it, so its units sold can't be changed. Link a POS item to it first.`,
+        );
+      }
+      const target = new Decimal(operation.quantity);
+      const before = totalSold(lines);
+      if (before.equals(target)) throw Problems.validation(`${item.name} already shows ${before.toString()} sold.`);
+      for (const scaled of scaleSales(lines, target)) {
+        await db.posSalesLine.update({
+          where: { id: scaled.id },
+          data: {
+            quantity: scaled.quantity,
+            netRevenue: scaled.netRevenue,
+            grossRevenue: scaled.grossRevenue,
+            confidence: 'PARTIALLY_VERIFIED',
+          },
+        });
+      }
+      return {
+        description: `Units sold of ${item.name} set to ${target.toString()}`,
+        before: before.toString(),
+        after: target.toString(),
+      };
+    }
+
+    case 'SET_ITEM_COST': {
+      const item = await findMenuItem(db, jobId, operation.menuItemId);
+      const cost = operation.cost === null ? null : new Decimal(operation.cost);
+      await db.menuItem.update({ where: { id: item.id }, data: { costOverride: cost } });
+      return {
+        description: cost
+          ? `Cost of ${item.name} set to ${cost.toFixed(2)} per portion`
+          : `Hand-entered cost of ${item.name} removed; its recipe sets the cost again`,
+        before: item.costOverride?.toString() ?? null,
+        after: cost?.toString() ?? null,
       };
     }
 

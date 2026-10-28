@@ -6,6 +6,7 @@ import type {
   FileCategory,
   ImpactPreview,
   JobStatusResponse,
+  Operation,
   Readiness,
   ResultsResponse,
   UploadedFile,
@@ -186,6 +187,14 @@ export const api = {
       `/jobs/${jobId}/revisions/${revisionId}/approve`,
       { method: "POST", token },
     ),
+
+  /** Edits made directly in the results table: applied and recalculated in one step. */
+  applyChanges: (jobId: string, token: string, operations: Operation[]) =>
+    request<{ revision: number; impact: ImpactPreview }>(`/jobs/${jobId}/revisions/apply`, {
+      method: "POST",
+      token,
+      body: { operations },
+    }),
 
   rejectRevision: (jobId: string, token: string, revisionId: string) =>
     request<{ status: string }>(`/jobs/${jobId}/revisions/${revisionId}/reject`, {

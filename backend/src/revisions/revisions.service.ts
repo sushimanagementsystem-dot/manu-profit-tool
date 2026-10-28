@@ -101,6 +101,15 @@ export class RevisionsService {
     });
   }
 
+  /**
+   * Applies edits the client made directly in the results table. They go through the same
+   * operations, validation, recalculation and revision history as a confirmed chat change, so the
+   * table, the assistant and the Excel workbook can never disagree about what the figures are.
+   */
+  applyManual(jobId: string, operations: Operation[]): Promise<{ revision: number; impact: ImpactPreview }> {
+    return this.apply(jobId, operations, { source: 'MANUAL' });
+  }
+
   async reject(jobId: string, revisionId: string): Promise<void> {
     const { count } = await this.prisma.revision.updateMany({
       where: { id: revisionId, jobId, status: 'PROPOSED' },
@@ -187,7 +196,8 @@ export class RevisionsService {
         effects.push(await applyOperation(db, jobId, revision, operation));
       } catch (error) {
         if (error instanceof ProblemException) {
-          throw Problems.validation(`Change ${index + 1} of ${operations.length}: ${error.detail ?? 'is not valid.'}`);
+          const reason = error.detail ?? 'is not valid.';
+          throw Problems.validation(operations.length === 1 ? reason : `Change ${index + 1} of ${operations.length}: ${reason}`);
         }
         throw error;
       }

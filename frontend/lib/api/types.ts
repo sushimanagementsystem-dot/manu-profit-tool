@@ -89,6 +89,8 @@ export type ResultItem = {
   grossPrice: string | null;
   netPrice: Metric;
   costPerPortion: Metric;
+  /** Where the cost came from: the recipe, or a figure the client entered. */
+  costSource: "RECIPE" | "MANUAL";
   gpPerPortion: Metric;
   gpPercent: Metric;
   unitsSold: string | null;
@@ -151,6 +153,13 @@ export type ImpactPreview = {
     deltaGpContribution: string | null;
   }[];
 };
+
+/** A change to the analysis inputs; the backend validates and applies these (revisions API). */
+export type Operation =
+  | { op: "RENAME_MENU_ITEM"; menuItemId: string; name: string }
+  | { op: "SET_UNITS_SOLD"; menuItemId: string; quantity: string }
+  | { op: "SET_SELLING_PRICE"; menuItemId: string; grossPrice: string }
+  | { op: "SET_ITEM_COST"; menuItemId: string; cost: string | null };
 
 export type ChatProposal = {
   revisionId: string;

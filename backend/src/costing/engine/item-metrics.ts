@@ -44,6 +44,10 @@ export function costPerPortion(
   ingredientNames: Map<string, string>,
   assumptions: EngineAssumptions,
 ): Metric {
+  // A cost the client typed in is the answer, not an input to a recipe: no wastage on top of it.
+  if (item.costOverride) {
+    return known(item.costOverride, 'PARTIALLY_VERIFIED', [`Cost of ${item.name} was entered by hand`]);
+  }
   if (!lines.length) return incomplete(`${item.name} has no recipe yet`);
 
   const wastageFactor = assumptions.wastagePct.plus(1);
@@ -123,6 +127,7 @@ export function computeItem(
     vatRate: vat,
     netPrice,
     costPerPortion: cost,
+    costSource: item.costOverride ? 'MANUAL' : 'RECIPE',
     gpPerPortion: gp,
     gpPercent,
     foodCostPercent,

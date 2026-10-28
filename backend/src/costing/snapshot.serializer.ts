@@ -82,6 +82,7 @@ export function serializeResult(
       vatRate: str(item.vatRate),
       netPrice: metric(item.netPrice),
       costPerPortion: metric(item.costPerPortion),
+      costSource: item.costSource,
       gpPerPortion: metric(item.gpPerPortion),
       gpPercent: metric(item.gpPercent),
       foodCostPercent: metric(item.foodCostPercent),

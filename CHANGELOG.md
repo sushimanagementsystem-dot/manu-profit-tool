@@ -5,6 +5,24 @@ All notable changes to this repository. Frontend-internal history before 2026-10
 
 ## [Unreleased]
 
+### 2026-10-28 — The results table is editable
+- **Added:** click a dish's name, units sold, menu price or cost in the results table to edit it in place, with Save
+  and Cancel (Enter / Escape), validation, a saving state and the server's own wording when it refuses a value.
+  An edit goes through the same revision pipeline as a change confirmed in the chat (`POST /revisions/apply`, source
+  `MANUAL`), so the headline figures, GP, recommendations, the assistant and the Excel workbook all follow, and the
+  workbook's Revision Log lists it. The rows an edit (or a chat change) moved are highlighted for a moment.
+- **Added (backend):** operations `RENAME_MENU_ITEM`, `SET_UNITS_SOLD` and `SET_ITEM_COST`, available to the chat too.
+  Units sold spreads the new total over the item's POS lines and moves their revenue with it, so the price charged at
+  the till survives. A hand-entered cost replaces the recipe cost (no wastage added) until it is cleared.
+- **Changed:** the assistant is told when the analysis changed since its last reply (by the table or a confirmed chat
+  change) and to look figures up again, so it does not keep quoting numbers from earlier in the conversation.
+- **Migration (additive):** `MenuItem.costOverride` (nullable) and the `RevisionSource` value `MANUAL`.
+- **Tests:** backend 71 → 87, frontend 24 → 43. Checked by hand in the browser: figures after each edit against a
+  hand calculation, an invalid value, a refused one, Escape, a phone-width screen, the Excel workbook, and the
+  assistant answering the same question before and after a table edit.
+- **Opened:** KI-21 (the upload slots read "Loading…" for 5–20 s), KI-22 (chat changes still need Apply), KI-23 (one
+  unexplained extra revision while testing).
+
 ### 2026-10-28 — Live deployment; a spreadsheet we cannot read now says why
 - **Deployed:** backend and frontend run on the project's Coolify host, and a PDF invoice goes upload →
   n8n → Claude → callback → `READY` there (about 25 s). Found on the way: `crypto.randomUUID` does not exist

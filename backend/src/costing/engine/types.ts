@@ -25,6 +25,8 @@ export type EngineMenuItem = {
   category: string | null;
   grossPrice: Decimal | null;
   priceConfidence: ConfidenceLevel;
+  /** Cost per portion entered by hand; when set it replaces the recipe-based cost. */
+  costOverride: Decimal | null;
 };
 
 export type EngineSale = {
@@ -86,6 +88,8 @@ export type ItemResult = {
   vatRate: Decimal | null;
   netPrice: Metric;
   costPerPortion: Metric;
+  /** Where the cost came from: the recipe, or a figure the client entered. */
+  costSource: 'RECIPE' | 'MANUAL';
   gpPerPortion: Metric;
   gpPercent: Metric;
   foodCostPercent: Metric;

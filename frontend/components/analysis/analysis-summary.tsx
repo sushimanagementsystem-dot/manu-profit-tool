@@ -17,7 +17,18 @@ const SEVERITY_STYLES = {
  * The headline figures and what still needs attention. Release 1 keeps this short on
  * purpose: the detail lives in the Excel file and in the chat.
  */
-export function AnalysisSummary({ results }: { results: ResultsResponse }) {
+export function AnalysisSummary({
+  results,
+  jobId,
+  token,
+  refreshing,
+}: {
+  results: ResultsResponse;
+  jobId: string;
+  token: string;
+  /** The figures are being recalculated after a change. */
+  refreshing: boolean;
+}) {
   const { summary, currency } = results;
   const tiles = [
     { label: "Net revenue", value: formatMoney(summary.netRevenue, currency) },
@@ -29,7 +40,9 @@ export function AnalysisSummary({ results }: { results: ResultsResponse }) {
   return (
     <Card className="w-full">
       <CardContent className="flex flex-col gap-5">
-        <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <dl
+          className={`grid grid-cols-2 gap-4 transition-opacity sm:grid-cols-4 ${refreshing ? "opacity-60" : ""}`}
+        >
           {tiles.map((tile) => (
             <div key={tile.label} className="flex flex-col gap-0.5">
               <dt className="text-xs text-muted-foreground">{tile.label}</dt>
@@ -48,7 +61,13 @@ export function AnalysisSummary({ results }: { results: ResultsResponse }) {
             " Tell the assistant below what goes into the missing dishes to complete it."}
         </p>
 
-        <ItemsTable items={results.items} currency={currency} />
+        <ItemsTable
+          items={results.items}
+          currency={currency}
+          jobId={jobId}
+          token={token}
+          refreshing={refreshing}
+        />
 
         {results.issues.length > 0 && (
           <ul className="flex flex-col gap-2 border-t pt-4">

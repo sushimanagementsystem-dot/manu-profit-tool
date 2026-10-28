@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 
@@ -41,6 +41,8 @@ export function AnalysisWorkspace({ jobId }: { jobId: string }) {
     queryKey: ["results", jobId, status.data?.currentRevision],
     enabled: Boolean(token) && isReady,
     queryFn: () => api.results(jobId, token as string),
+    // Keep the table on screen while new figures load, so an edit never blanks it.
+    placeholderData: keepPreviousData,
   });
 
   const retry = useMutation({
@@ -92,7 +94,12 @@ export function AnalysisWorkspace({ jobId }: { jobId: string }) {
       <IncompleteBanner files={unread} />
       {results.data ? (
         <>
-          <AnalysisSummary results={results.data} />
+          <AnalysisSummary
+            results={results.data}
+            jobId={jobId}
+            token={token}
+            refreshing={results.isFetching}
+          />
           <DownloadCard
             jobId={jobId}
             token={token}

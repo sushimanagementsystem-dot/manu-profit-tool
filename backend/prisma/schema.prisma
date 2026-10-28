@@ -120,6 +120,8 @@ enum RevisionStatus {
 enum RevisionSource {
   CHAT
   SYSTEM
+  /** Edited by the client directly in the results table. */
+  MANUAL
 }
 
 enum ChatRole {
@@ -244,6 +246,8 @@ model MenuItem {
   category       String?
   description    String?
   grossPrice     Decimal?       @db.Decimal(14, 4)
+  /// Cost per portion entered by hand. When set it replaces the recipe-based cost; null means "use the recipe".
+  costOverride   Decimal?       @db.Decimal(14, 4)
   confidence     Confidence     @default(VERIFIED)
   origin         RowOrigin      @default(EXTRACTED)
   createdAt      DateTime       @default(now()) @db.Timestamptz(6)

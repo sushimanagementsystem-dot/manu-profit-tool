@@ -119,6 +119,14 @@ Returns the data-quality issues and missing information (blocking first). Each i
   (UI edits). It returns 201 `{ revision }` or 409 `revision_conflict`.
 - `POST /jobs/{jobId}/revisions/{revisionId}/approve` returns 200 `{ revision, snapshot: { revision, snapshotHash } }`.
   It is idempotent and returns 409 if STALE or REJECTED.
+- **As built (Release 1):** `POST /jobs/{jobId}/revisions/apply` takes `{ "operations": [ … ] }` (1–20) and is what the
+  results table's inline edits call. It validates, applies, recalculates and records one revision in a single
+  transaction (source `MANUAL`) and returns `{ revision, impact }`. A failed operation rolls everything back and
+  answers 422 with the reason (no `baseRevision` check; operations are validated against the current data).
+  Operations added for it, all validated by the same zod schema as the chat's:
+  `RENAME_MENU_ITEM { menuItemId, name }`, `SET_UNITS_SOLD { menuItemId, quantity }` (spreads the new total over
+  the item's POS lines and moves their revenue with the quantity) and `SET_ITEM_COST { menuItemId, cost | null }`
+  (a hand-entered cost per portion that replaces the recipe cost; `null` hands the decision back to the recipe).
 - `POST /jobs/{jobId}/revisions/{revisionId}/reject` returns 200.
 - `GET /jobs/{jobId}/revisions` returns the history with diffs (`appliedDiff`), source, and timestamps.
 

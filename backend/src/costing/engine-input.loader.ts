@@ -41,6 +41,7 @@ export async function loadEngineInput(db: Db, jobId: string): Promise<EngineInpu
       category: item.category,
       grossPrice: item.grossPrice,
       priceConfidence: toLevel(item.confidence),
+      costOverride: item.costOverride,
     })),
     sales: matched.map((line) => ({
       menuItemId: line.menuItemId as string,

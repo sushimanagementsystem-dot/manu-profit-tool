@@ -7,6 +7,8 @@ import { operationsSchema } from './operations.schema';
 import { RevisionsService } from './revisions.service';
 
 const previewSchema = z.object({ operations: operationsSchema });
+/** A table edit changes one cell or a handful; anything bigger belongs in the chat. */
+const applySchema = z.object({ operations: operationsSchema.max(20) });
 
 @Controller('jobs/:jobId/revisions')
 @UseGuards(JobAccessGuard)
@@ -24,6 +26,11 @@ export class RevisionsController {
     @Body(new ZodBodyPipe(previewSchema)) body: z.infer<typeof previewSchema>,
   ) {
     return { impact: await this.revisions.preview(job.id, body.operations) };
+  }
+
+  @Post('apply')
+  apply(@CurrentJob() job: JobContext, @Body(new ZodBodyPipe(applySchema)) body: z.infer<typeof applySchema>) {
+    return this.revisions.applyManual(job.id, body.operations);
   }
 
   @Post(':revisionId/approve')

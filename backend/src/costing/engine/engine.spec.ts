@@ -21,7 +21,7 @@ function burgerInput(overrides: Partial<EngineInput> = {}): EngineInput {
   return {
     assumptions: assumptions(),
     menuItems: [
-      { id: 'burger', name: 'Classic Burger', category: 'Mains', grossPrice: dec('14.50'), priceConfidence: 'VERIFIED' },
+      { id: 'burger', name: 'Classic Burger', category: 'Mains', grossPrice: dec('14.50'), priceConfidence: 'VERIFIED', costOverride: null },
     ],
     sales: [
       { menuItemId: 'burger', quantity: dec('320'), netRevenue: dec('3680'), grossRevenue: null, matchConfidence: 'VERIFIED' },
@@ -202,8 +202,8 @@ describe('menu mix and the engineering matrix', () => {
   const twoItemInput = (): EngineInput => ({
     ...burgerInput(),
     menuItems: [
-      { id: 'star', name: 'Star Dish', category: 'Mains', grossPrice: dec('20'), priceConfidence: 'VERIFIED' },
-      { id: 'dog', name: 'Dog Dish', category: 'Mains', grossPrice: dec('10'), priceConfidence: 'VERIFIED' },
+      { id: 'star', name: 'Star Dish', category: 'Mains', grossPrice: dec('20'), priceConfidence: 'VERIFIED', costOverride: null },
+      { id: 'dog', name: 'Dog Dish', category: 'Mains', grossPrice: dec('10'), priceConfidence: 'VERIFIED', costOverride: null },
     ],
     sales: [
       { menuItemId: 'star', quantity: dec('300'), netRevenue: dec('5000'), grossRevenue: null, matchConfidence: 'VERIFIED' },
@@ -269,8 +269,8 @@ describe('recommendations', () => {
     const input: EngineInput = {
       ...burgerInput(),
       menuItems: [
-        { id: 'plow', name: 'Plowhorse', category: 'Mains', grossPrice: dec('10'), priceConfidence: 'VERIFIED' },
-        { id: 'rich', name: 'Rich Dish', category: 'Mains', grossPrice: dec('30'), priceConfidence: 'VERIFIED' },
+        { id: 'plow', name: 'Plowhorse', category: 'Mains', grossPrice: dec('10'), priceConfidence: 'VERIFIED', costOverride: null },
+        { id: 'rich', name: 'Rich Dish', category: 'Mains', grossPrice: dec('30'), priceConfidence: 'VERIFIED', costOverride: null },
       ],
       sales: [
         { menuItemId: 'plow', quantity: dec('400'), netRevenue: dec('3500'), grossRevenue: null, matchConfidence: 'VERIFIED' },
@@ -291,5 +291,43 @@ describe('recommendations', () => {
     const input = burgerInput({ recipeLines: [] });
     const { recommendations } = computeResults(input, 'EUR');
     expect(recommendations.some((item) => item.kind === 'DATA_QUALITY')).toBe(true);
+  });
+});
+
+describe('a cost entered by hand', () => {
+  const withOverride = (cost: string, overrides: Partial<EngineInput> = {}) =>
+    burgerInput({
+      menuItems: [
+        { id: 'burger', name: 'Classic Burger', category: 'Mains', grossPrice: dec('14.50'), priceConfidence: 'VERIFIED', costOverride: dec(cost) },
+      ],
+      ...overrides,
+    });
+
+  it('replaces the recipe cost and says where it came from', () => {
+    const item = firstItem(withOverride('3.00'));
+    expect(item.costPerPortion.value?.toNumber()).toBe(3);
+    expect(item.costSource).toBe('MANUAL');
+    expect(item.costPerPortion.confidence).toBe('PARTIALLY_VERIFIED');
+    expect(item.costPerPortion.reasons).toContain('Cost of Classic Burger was entered by hand');
+    // Everything downstream follows: GP = net price 12.7753… - 3.00
+    expect(item.gpPerPortion.value?.toNumber()).toBeCloseTo(9.77533, 4);
+  });
+
+  it('is not marked up by the wastage allowance', () => {
+    const item = firstItem(withOverride('3.00', { assumptions: assumptions({ wastagePct: dec('0.10') }) }));
+    expect(item.costPerPortion.value?.toNumber()).toBe(3);
+  });
+
+  it('costs a dish that has no recipe, so it is not reported as missing one', () => {
+    const result = computeResults(withOverride('3.00', { recipeLines: [] }), 'EUR');
+    expect(result.items[0].costPerPortion.value?.toNumber()).toBe(3);
+    expect(result.summary.itemsCosted).toBe(1);
+    expect(result.issues.map((issue) => issue.code)).not.toContain('recipes_missing');
+  });
+
+  it('leaves the recipe in charge when nothing was entered', () => {
+    const item = firstItem(burgerInput());
+    expect(item.costSource).toBe('RECIPE');
+    expect(item.costPerPortion.value?.toNumber()).toBeCloseTo(0.84, 6);
   });
 });

@@ -87,7 +87,9 @@ export class ChatService {
 
     const stored = await this.prisma.chatMessage.findMany({ where: { jobId }, orderBy: { seq: 'asc' } });
     const nextSeq = stored.length ? stored[stored.length - 1].seq + 1 : 0;
-    const userTurn = await this.storeUserMessage(jobId, nextSeq, revision, text, stored.length === 0);
+    const lastSeenRevision = stored.length ? stored[stored.length - 1].revisionAtTime : null;
+    const note = lastSeenRevision !== null && revision > lastSeenRevision ? await this.changesSince(jobId, lastSeenRevision, revision) : null;
+    const userTurn = await this.storeUserMessage(jobId, nextSeq, revision, text, stored.length === 0, note);
 
     const history = stored.slice(-HISTORY_WINDOW).flatMap((message) => message.apiContent as unknown as ChatTurn[]);
     const messages: ChatTurn[] = [...history, userTurn];
@@ -140,6 +142,27 @@ export class ChatService {
     throw Problems.aiUnavailable('The assistant could not complete that request. Try asking it more simply.');
   }
 
+  /**
+   * What changed in the analysis since the assistant last saw it, whoever changed it: the client
+   * editing the table, or a change confirmed from the chat. Without this the assistant would go on
+   * quoting figures from earlier in the conversation that no longer hold.
+   */
+  private async changesSince(jobId: string, from: number, to: number): Promise<string> {
+    const revisions = await this.prisma.revision.findMany({
+      where: { jobId, status: 'APPROVED', number: { gt: from, lte: to } },
+      orderBy: { number: 'asc' },
+      select: { appliedDiff: true },
+    });
+    const changes = revisions.flatMap((revision) =>
+      ((revision.appliedDiff as unknown as { description: string }[] | null) ?? []).map((effect) => effect.description),
+    );
+    return (
+      `[System note, not from the user: the analysis changed since your last reply (revision ${from} to ${to}).` +
+      (changes.length ? ` Changes: ${changes.slice(0, 20).join('; ')}.` : '') +
+      ' Figures you quoted earlier may be out of date; look them up again with your tools before answering.]'
+    );
+  }
+
   /** The job summary rides along with the first question, keeping the system prompt cacheable. */
   private async storeUserMessage(
     jobId: string,
@@ -147,10 +170,10 @@ export class ChatService {
     revision: number,
     text: string,
     withContext: boolean,
+    note: string | null = null,
   ): Promise<ChatTurn> {
-    const content = withContext
-      ? `${buildJobContext((await this.snapshots.get(jobId)).payload)}\n\n---\n\n${text}`
-      : text;
+    const context = withContext ? `${buildJobContext((await this.snapshots.get(jobId)).payload)}\n\n---\n\n` : '';
+    const content = `${context}${note ? `${note}\n\n---\n\n` : ''}${text}`;
     const turn: ChatTurn = { role: 'user', content };
     await this.prisma.chatMessage.create({
       data: {
