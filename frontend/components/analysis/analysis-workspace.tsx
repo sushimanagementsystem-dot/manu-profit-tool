@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 
 import { AnalysisFooter } from "@/components/analysis/analysis-footer";
 import { AnalysisProgress } from "@/components/analysis/analysis-progress";
+import { AiCostCard } from "@/components/analysis/ai-cost-card";
 import { AnalysisSummary } from "@/components/analysis/analysis-summary";
 import { ChatPanel } from "@/components/analysis/chat-panel";
 import { DownloadCard } from "@/components/analysis/download-card";
@@ -112,6 +113,7 @@ export function AnalysisWorkspace({ jobId }: { jobId: string }) {
             currency={results.data.currency}
             disabled={false}
           />
+          <AiCostCard jobId={jobId} token={token} />
         </>
       ) : (
         <CenteredNote icon>Loading your results…</CenteredNote>

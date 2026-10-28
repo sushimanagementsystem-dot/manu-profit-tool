@@ -1,5 +1,6 @@
 import type {
   ChatMessage,
+  AiUsageResponse,
   ChatReply,
   CreatedJob,
   ExportView,
@@ -187,6 +188,9 @@ export const api = {
       `/jobs/${jobId}/revisions/${revisionId}/approve`,
       { method: "POST", token },
     ),
+
+  aiUsage: (jobId: string, token: string) =>
+    request<AiUsageResponse>(`/jobs/${jobId}/ai-usage`, { token }),
 
   /** Edits made directly in the results table: applied and recalculated in one step. */
   applyChanges: (jobId: string, token: string, operations: Operation[]) =>

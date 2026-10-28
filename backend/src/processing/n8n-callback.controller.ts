@@ -15,6 +15,7 @@ import {
 } from '../extraction/extraction.schemas';
 import { ExtractionIngestService } from '../extraction/extraction-ingest.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { AiUsageService } from '../usage/ai-usage.service';
 import { assertCallbackAuthentic } from './callback-auth';
 import { RetryableTaskError, TaskRunnerService, UnrecoverableTaskError } from './task-runner.service';
 
@@ -51,6 +52,7 @@ export class N8nCallbackController {
     private readonly prisma: PrismaService,
     private readonly ingest: ExtractionIngestService,
     private readonly runner: TaskRunnerService,
+    private readonly aiUsage: AiUsageService,
   ) {}
 
   @Post('callbacks')
@@ -136,17 +138,6 @@ export class N8nCallbackController {
 
   private async recordUsage(jobId: string, usage: z.infer<typeof callbackSchema>['usage']): Promise<void> {
     if (!usage) return;
-    const job = await this.prisma.analysisJob.findUniqueOrThrow({ where: { id: jobId }, select: { aiUsage: true } });
-    const current = (job.aiUsage ?? {}) as { inputTokens?: number; outputTokens?: number; calls?: number };
-    await this.prisma.analysisJob.update({
-      where: { id: jobId },
-      data: {
-        aiUsage: {
-          inputTokens: (current.inputTokens ?? 0) + (usage.inputTokens ?? 0),
-          outputTokens: (current.outputTokens ?? 0) + (usage.outputTokens ?? 0),
-          calls: (current.calls ?? 0) + 1,
-        },
-      },
-    });
+    await this.aiUsage.recordExtraction(jobId, usage);
   }
 }

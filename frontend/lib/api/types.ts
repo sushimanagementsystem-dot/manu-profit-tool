@@ -161,6 +161,26 @@ export type Operation =
   | { op: "SET_SELLING_PRICE"; menuItemId: string; grossPrice: string }
   | { op: "SET_ITEM_COST"; menuItemId: string; cost: string | null };
 
+/** What the AI cost for one analysis. Only filled in when the server has SHOW_AI_COST on. */
+export type AiUsagePart = {
+  calls: number;
+  inputTokens: number;
+  outputTokens: number;
+  /** US dollars; null when a model has no known price. */
+  costUsd: string | null;
+};
+
+export type AiUsageResponse =
+  | { enabled: false }
+  | {
+      enabled: true;
+      extraction: AiUsagePart;
+      chat: AiUsagePart;
+      totalUsd: string | null;
+      currency: "USD";
+      note: string;
+    };
+
 export type ChatProposal = {
   revisionId: string;
   summary: string;

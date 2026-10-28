@@ -5,6 +5,20 @@ All notable changes to this repository. Frontend-internal history before 2026-10
 
 ## [Unreleased]
 
+### 2026-10-28 — Show a client what the AI cost (testing aid, switchable)
+- **Added:** a card under the chat saying what the AI cost for that analysis: reading the files, the assistant, and the
+  total, in US dollars, with an "estimate" caveat. For a client who is testing the product and wants to see what
+  Claude costs per analysis. Every extraction and chat call is now counted per job and per model (`aiUsage.ledger`),
+  priced at list prices including prompt-cache writes (×1.25) and reads (×0.1), and a model with no price in
+  `usage/ai-pricing.ts` is reported as "not priced" rather than guessed. Closes KI-20.
+- **Switch:** `SHOW_AI_COST=true` on the backend turns it on; left `false` (the default) the endpoint returns
+  `{ enabled: false }` and the card renders nothing. **To remove it before the product is public:** set the flag to
+  `false`, or delete `frontend/components/analysis/ai-cost-card.tsx` and its one line in `analysis-workspace.tsx`.
+- **Checked:** the card's figure after a real question ($0.0400 for two calls) matches a hand calculation from the
+  logged token counts; extraction (7,374 in + 2,167 out on Opus 5.5) prices to the $0.0728 measured earlier. Backend
+  71 → 97 tests, frontend 43 → 46.
+- **Not shown:** the cost of jobs created before this change, and anything in euros (Anthropic bills in dollars).
+
 ### 2026-10-28 — The results table is editable
 - **Added:** click a dish's name, units sold, menu price or cost in the results table to edit it in place, with Save
   and Cancel (Enter / Escape), validation, a saving state and the server's own wording when it refuses a value.

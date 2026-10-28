@@ -4,6 +4,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Problems } from '../common/problem';
 import { SnapshotService } from '../costing/snapshot.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { AiUsageService } from '../usage/ai-usage.service';
 import { buildJobContext, CHAT_SYSTEM_PROMPT } from './chat.prompt';
 import { ChatToolExecutor } from './chat-tool.executor';
 import { buildToolDefinitions } from './chat.tools';
@@ -47,6 +48,7 @@ export class ChatService {
     private readonly claude: ClaudeClient,
     private readonly executor: ChatToolExecutor,
     private readonly snapshots: SnapshotService,
+    private readonly aiUsage: AiUsageService,
   ) {}
 
   async history(jobId: string): Promise<ChatMessageView[]> {
@@ -115,6 +117,10 @@ export class ChatService {
 
     for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
       const response = await this.claude.send({ system, tools: this.tools, messages });
+      // Priced as the model that actually answered, which is not always the one asked for.
+      await this.aiUsage
+        .recordChat(jobId, response.model, response.usage)
+        .catch((error: unknown) => this.logger.warn({ jobId, error: String(error) }, 'Could not record chat usage'));
       messages.push({ role: 'assistant', content: response.content });
 
       const toolUses = response.content.filter(

@@ -4,6 +4,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 
 import { ChatModule } from './chat/chat.module';
+import { AiUsageModule } from './usage/ai-usage.module';
 import { CleanupModule } from './cleanup/cleanup.module';
 import { ConfigModule } from './config/config.module';
 import { CostingModule } from './costing/costing.module';
@@ -36,6 +37,7 @@ import { StorageModule } from './storage/storage.module';
     CostingModule,
     RevisionsModule,
     ChatModule,
+    AiUsageModule,
     ExportsModule,
     CleanupModule,
     HealthModule,

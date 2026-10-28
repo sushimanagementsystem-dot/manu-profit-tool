@@ -27,6 +27,15 @@ export const envSchema = z.object({
   /** Cost/quality control for the chat model. Lower it while testing, not in production. */
   CHAT_EFFORT: z.enum(['low', 'medium', 'high']).default('medium'),
 
+  /**
+   * Show each client what the AI cost for their analysis. For client testing: leave it `false`
+   * (or delete the card that shows it) before the product is public.
+   */
+  SHOW_AI_COST: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+
   N8N_BASE_URL: optionalString,
   N8N_EXTRACT_PATH: z.string().default('/webhook/mp-extract'),
   N8N_INBOUND_KEY: optionalString,

@@ -58,6 +58,8 @@ export function ChatPanel({
         setImpacts((current) => ({ ...current, [reply.proposal!.revisionId]: reply.proposal!.impact }));
       }
       void queryClient.invalidateQueries({ queryKey: ["chat", jobId] });
+      // Every answer costs something; the cost card, when it is on, picks the new figure up.
+      void queryClient.invalidateQueries({ queryKey: ["ai-cost", jobId] });
     },
     onError: (error) =>
       toast.error(error instanceof ApiError ? error.message : "The assistant did not reply."),
