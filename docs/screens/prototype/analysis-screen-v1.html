@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Menu Profit — analysis screen v1 (prototype)</title>
+<!-- Geist (SIL OFL), copied from the app's own build so the prototype renders offline and in the app's typeface. -->
+<style>
+@font-face { font-family: "Geist"; font-weight: 100 900; font-display: block; src: url(fonts/geist-latin.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Geist"; font-weight: 100 900; font-display: block; src: url(fonts/geist-latin-ext.woff2) format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+/* ---------------------------------------------------------------------------------------------
+   Prototype of the Menu Profit analysis screen (docs/phases/phase-11-analysis-screen-redesign.md).
+   Static HTML, not shipped code. Every figure is computed below from the dummy dataset in
+   ~/Downloads/MenuProfit-TestData, using the same rules as backend/src/costing/engine.
+   --------------------------------------------------------------------------------------------- */
+:root {
+  --bg: #f6f5f1;
+  --surface: #ffffff;
+  --surface-2: #faf9f6;
+  --line: #e8e6e0;
+  --line-soft: #f0eee9;
+  --ink: #14171a;
+  --ink-2: #4a5058;
+  --muted: #7b8189;
+  --brand: #059669;
+  --brand-ink: #047857;
+  --brand-soft: #ecfdf5;
+  --brand-line: #a7f3d0;
+  --amber: #b45309;
+  --amber-soft: #fffbeb;
+  --amber-line: #fde68a;
+  --rose: #be123c;
+  --rose-soft: #fff1f2;
+  --rose-line: #fecdd3;
+  --blue: #1d4ed8;
+  --blue-soft: #eff6ff;
+  --violet: #6d28d9;
+  --violet-soft: #f5f3ff;
+  --radius: 14px;
+  --shadow: 0 1px 2px rgba(20, 23, 26, .04), 0 4px 16px rgba(20, 23, 26, .04);
+  font-family: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.45;
+  background: linear-gradient(160deg, #fdf1f0 0%, #f7f5f1 30%, #fbf9f2 100%);
+  background-repeat: no-repeat;
+  min-height: 100vh;
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+.num { font-variant-numeric: tabular-nums; }
+svg.i { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+svg.i.sm { width: 13px; height: 13px; }
+svg.i.lg { width: 20px; height: 20px; }
+
+/* ----- header ----- */
+.top {
+  position: sticky; top: 0; z-index: 20;
+  background: rgba(255, 255, 255, .82);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+.top-in { max-width: 1488px; margin: 0 auto; padding: 0 24px; height: 64px; display: flex; align-items: center; gap: 12px; }
+.brand { display: flex; align-items: center; gap: 10px; margin-right: auto; }
+.brand svg { width: 30px; height: 30px; color: #10b981; stroke-width: 2.4; }
+.brand b { display: block; font-size: 17px; letter-spacing: -.01em; line-height: 1.1; }
+.brand small { display: block; font-size: 9.5px; letter-spacing: .16em; color: var(--muted); font-weight: 600; }
+.chip { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); font-size: 12.5px; white-space: nowrap; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 38px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); font-weight: 500; font-size: 13.5px; white-space: nowrap; transition: background .15s, border-color .15s; }
+.btn:hover { background: var(--surface-2); border-color: #d9d6cd; }
+.btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 600; box-shadow: 0 1px 2px rgba(5, 150, 105, .35); }
+.btn.primary:hover { background: var(--brand-ink); }
+.btn.primary small { font-weight: 500; opacity: .85; font-size: 11.5px; margin-left: 2px; }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--ink-2); }
+.btn.sm { height: 30px; padding: 0 11px; font-size: 12.5px; border-radius: 8px; }
+.btn:focus-visible, .cell-btn:focus-visible, .pill-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* ----- layout ----- */
+.wrap { max-width: 1488px; margin: 0 auto; padding: 24px; display: grid; grid-template-columns: minmax(0, 1fr) 372px; gap: 24px; align-items: start; }
+.main { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+.title-row { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; }
+.title-row h1 { margin: 0; font-size: 26px; letter-spacing: -.02em; line-height: 1.15; }
+.title-row p { margin: 4px 0 0; color: var(--muted); font-size: 13.5px; }
+.status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--brand-ink); background: var(--brand-soft); border: 1px solid var(--brand-line); padding: 3px 10px; border-radius: 999px; }
+.status i { width: 7px; height: 7px; border-radius: 50%; background: var(--brand); }
+
+/* ----- KPI ----- */
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.kpi { padding: 16px 18px 16px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.kpi .row { display: flex; align-items: center; gap: 9px; color: var(--ink-2); font-size: 13px; font-weight: 500; }
+.chipi { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; }
+.chipi.green { background: var(--brand-soft); color: var(--brand-ink); }
+.chipi.blue { background: var(--blue-soft); color: var(--blue); }
+.chipi.violet { background: var(--violet-soft); color: var(--violet); }
+.chipi.amber { background: var(--amber-soft); color: var(--amber); }
+.kpi .val { font-size: 28px; font-weight: 650; letter-spacing: -.025em; margin-top: 6px; line-height: 1.1; }
+.kpi .sub { color: var(--muted); font-size: 12.5px; }
+.kpi .sub b { color: var(--ink-2); font-weight: 600; }
+.meter { height: 7px; border-radius: 99px; background: var(--line-soft); overflow: hidden; margin: 8px 0 2px; }
+.meter i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #34d399, var(--brand)); }
+.kpi.hero { background: linear-gradient(180deg, #f3fbf7 0%, #fff 70%); border-color: var(--brand-line); }
+.badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+.badge.green { background: var(--brand-soft); color: var(--brand-ink); }
+.badge.amber { background: var(--amber-soft); color: var(--amber); }
+
+/* ----- attention strip ----- */
+.attn { display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--amber-soft); border-color: var(--amber-line); box-shadow: none; }
+.attn .ico { width: 36px; height: 36px; border-radius: 10px; background: #fef3c7; color: var(--amber); display: grid; place-items: center; flex: none; }
+.attn h2 { margin: 0; font-size: 15px; }
+.attn p { margin: 2px 0 0; color: #7c5a14; font-size: 13px; }
+.attn .tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.attn .btn { margin-left: auto; flex: none; }
+.tag { font-size: 11.5px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid; }
+.tag.rose { color: var(--rose); background: var(--rose-soft); border-color: var(--rose-line); }
+.tag.amber { color: var(--amber); background: #fff; border-color: var(--amber-line); }
+.tag.gray { color: var(--ink-2); background: #fff; border-color: var(--line); }
+
+/* ----- assumptions ----- */
+.assume { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
+.assume .chip { height: 28px; font-size: 12px; background: rgba(255,255,255,.7); }
+.assume .chip b { font-weight: 600; color: var(--ink); }
+.assume .link { color: var(--brand-ink); font-weight: 500; text-decoration: none; margin-left: 2px; }
+
+/* ----- table card ----- */
+.tcard { overflow: hidden; }
+.tbar { display: flex; align-items: center; gap: 12px; padding: 16px 18px 12px; flex-wrap: wrap; }
+.tbar h2 { margin: 0; font-size: 17px; letter-spacing: -.01em; display: flex; align-items: center; gap: 8px; }
+.tbar h2 .count { font-size: 12px; font-weight: 600; background: var(--line-soft); color: var(--ink-2); padding: 2px 8px; border-radius: 999px; }
+.search { margin-left: auto; position: relative; width: 240px; }
+.search svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+.search input { width: 100%; height: 36px; border: 1px solid var(--line); border-radius: 10px; padding: 0 12px 0 34px; font: inherit; font-size: 13.5px; background: var(--surface); color: var(--ink); }
+.search input::placeholder { color: #9aa0a8; }
+.filters { display: flex; align-items: center; gap: 6px; padding: 0 18px 12px; flex-wrap: wrap; }
+.pill-btn { white-space: nowrap; flex: none; height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-size: 12.5px; color: var(--ink-2); font-weight: 500; display: inline-flex; align-items: center; gap: 6px; }
+.pill-btn .n { color: var(--muted); font-weight: 600; }
+.pill-btn.on { background: var(--ink); border-color: var(--ink); color: #fff; }
+.pill-btn.on .n { color: #cbd1d8; }
+.filters .sort { margin-left: auto; color: var(--muted); font-size: 12.5px; display: flex; align-items: center; gap: 6px; }
+.filters .sort b { color: var(--ink); font-weight: 600; }
+.tscroll { overflow-x: auto; border-top: 1px solid var(--line); }
+table { width: 100%; min-width: 900px; border-collapse: separate; border-spacing: 0; font-size: 13.5px; }
+thead th { position: sticky; top: 0; background: var(--surface-2); color: var(--muted); font-size: 11.5px; font-weight: 600; letter-spacing: .02em; text-align: right; padding: 10px 9px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+thead th:first-child, tbody th { text-align: left; }
+thead th.sorted { color: var(--ink); }
+tbody td, tbody th { padding: 0 9px; height: 52px; border-bottom: 1px solid var(--line-soft); text-align: right; font-weight: 400; white-space: nowrap; }
+tbody th { font-weight: 500; text-align: left; }
+tbody tr:last-child td, tbody tr:last-child th { border-bottom: 0; }
+tbody tr:hover td, tbody tr:hover th { background: #fbfaf8; }
+tr.updated td, tr.updated th { background: #f1fbf6 !important; }
+tr.updated th { box-shadow: inset 3px 0 0 var(--brand); }
+tr.editing td, tr.editing th { background: #fffefa !important; }
+.item { display: flex; align-items: center; gap: 9px; min-width: 178px; }
+.mono { width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center; font-weight: 650; font-size: 13px; flex: none; }
+.item .nm { display: block; line-height: 1.25; }
+.item .ct { display: block; font-size: 11.5px; color: var(--muted); font-weight: 400; }
+.cell-btn { display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; min-width: 52px; padding: 5px 7px; margin: 0 -7px; border: 0; background: transparent; border-radius: 8px; border-bottom: 1px dashed #d8d5cc; border-bottom-left-radius: 0; border-bottom-right-radius: 0; font-variant-numeric: tabular-nums; }
+.cell-btn:hover { background: var(--line-soft); border-bottom-color: transparent; border-radius: 8px; }
+.cell-btn .pen { opacity: 0; color: var(--muted); }
+.cell-btn:hover .pen, .cell-btn.hot .pen { opacity: 1; }
+th .cell-btn { justify-content: flex-start; }
+.tagx { font-size: 11px; font-style: italic; color: var(--muted); margin-left: 2px; }
+.dash { color: #b3b8be; }
+.addcost { display: inline-flex; align-items: center; gap: 5px; border: 1px dashed #cdd1d6; background: transparent; color: var(--amber); font-size: 12.5px; font-weight: 600; padding: 4px 9px; border-radius: 8px; }
+.addcost:hover { background: var(--amber-soft); border-color: var(--amber-line); }
+.gp { display: inline-flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.gp .bar { width: 30px; height: 5px; border-radius: 99px; background: var(--line-soft); overflow: hidden; }
+.gp .bar i { display: block; height: 100%; border-radius: 99px; }
+.cls { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px; }
+.cls i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.cls.star { color: var(--brand-ink); background: var(--brand-soft); }
+.cls.plow { color: var(--blue); background: var(--blue-soft); }
+.cls.puzzle { color: var(--violet); background: var(--violet-soft); }
+.cls.dog { color: var(--rose); background: var(--rose-soft); }
+.cls.need { color: var(--amber); background: var(--amber-soft); }
+.cls.link { color: var(--rose); background: var(--rose-soft); }
+.upd { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--brand-ink); background: #d1fae5; padding: 1px 6px; border-radius: 6px; margin-left: 6px; }
+.editor { display: inline-flex; align-items: center; gap: 4px; }
+.editor input { width: 62px; height: 30px; border: 1.5px solid var(--brand); border-radius: 8px; padding: 0 9px; text-align: right; font: inherit; font-variant-numeric: tabular-nums; box-shadow: 0 0 0 3px rgba(5, 150, 105, .14); background: #fff; }
+.editor .ib { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--line); background: #fff; display: grid; place-items: center; }
+.editor .ib.ok { color: var(--brand-ink); border-color: var(--brand-line); background: var(--brand-soft); }
+.editor-note { display: block; font-size: 11px; color: var(--muted); text-align: right; margin-top: 2px; line-height: 1.2; }
+tfoot td { padding: 0 9px; height: 46px; background: var(--surface-2); border-top: 1px solid var(--line); text-align: right; font-weight: 600; font-size: 13px; }
+tfoot td:first-child { text-align: left; color: var(--ink-2); }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; padding: 12px 18px 14px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--line-soft); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend b { color: var(--ink-2); font-weight: 600; font-style: normal; }
+
+/* ----- issues & recommendations ----- */
+.pair { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.panel { padding: 16px 18px 6px; }
+.panel h2 { margin: 0 0 12px; font-size: 16px; letter-spacing: -.01em; display: flex; align-items: center; gap: 8px; }
+.panel h2 .count { font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 99px; background: var(--rose-soft); color: var(--rose); }
+.issue { display: flex; gap: 11px; padding: 11px 0; border-top: 1px solid var(--line-soft); align-items: flex-start; }
+.issue:first-of-type { border-top: 0; padding-top: 0; }
+.issue .ic { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; flex: none; }
+.issue .ic.rose { background: var(--rose-soft); color: var(--rose); }
+.issue .ic.amber { background: var(--amber-soft); color: var(--amber); }
+.issue .ic.gray { background: var(--line-soft); color: var(--muted); }
+.issue p { margin: 0; font-size: 13.5px; color: var(--ink-2); }
+.issue p b { color: var(--ink); font-weight: 600; }
+.issue .acts { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.rec { padding: 12px 0; border-top: 1px solid var(--line-soft); }
+.rec:first-of-type { border-top: 0; padding-top: 0; }
+.rec .h { display: flex; align-items: flex-start; gap: 10px; }
+.rec .k { font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 2px 7px; border-radius: 6px; flex: none; margin-top: 1px; }
+.rec .k.price { background: var(--brand-soft); color: var(--brand-ink); }
+.rec .k.cost { background: var(--blue-soft); color: var(--blue); }
+.rec .k.data { background: var(--amber-soft); color: var(--amber); }
+.rec h3 { margin: 0; font-size: 13.5px; line-height: 1.35; font-weight: 600; }
+.rec p { margin: 4px 0 0 0; font-size: 12.5px; color: var(--muted); }
+.rec .imp { margin-left: auto; flex: none; font-size: 12.5px; font-weight: 650; color: var(--brand-ink); white-space: nowrap; }
+.foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; color: var(--muted); font-size: 12.5px; padding: 4px 2px 24px; }
+.foot .sp { margin-left: auto; display: flex; gap: 6px; }
+.btn.danger { color: var(--rose); }
+.btn.danger:hover { background: var(--rose-soft); border-color: var(--rose-line); }
+
+/* ----- assistant ----- */
+.chat { position: sticky; top: 88px; height: calc(100vh - 112px); min-height: 640px; max-height: 900px; display: flex; flex-direction: column; overflow: hidden; }
+.chat-h { display: flex; align-items: center; gap: 11px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.chat-h .logo { width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg, #34d399, var(--brand)); color: #fff; display: grid; place-items: center; }
+.chat-h b { display: block; font-size: 15px; line-height: 1.2; }
+.chat-h small { display: block; color: var(--muted); font-size: 12px; }
+.chat-h .live { margin-left: auto; font-size: 11.5px; color: var(--brand-ink); display: inline-flex; align-items: center; gap: 6px; background: var(--brand-soft); padding: 3px 9px; border-radius: 99px; font-weight: 600; }
+.chat-h .live i { width: 6px; height: 6px; border-radius: 50%; background: var(--brand); }
+.chat-body { flex: 1; overflow: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+.sugg { display: flex; flex-wrap: wrap; gap: 6px; }
+.sugg button { font-size: 12.5px; padding: 6px 11px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); text-align: left; }
+.sugg button:hover { background: var(--surface-2); }
+.msg { max-width: 92%; padding: 10px 13px; border-radius: 14px; font-size: 13.5px; line-height: 1.5; }
+.msg.u { align-self: flex-end; background: var(--ink); color: #fff; border-bottom-right-radius: 5px; }
+.msg.a { align-self: flex-start; background: var(--surface-2); border: 1px solid var(--line-soft); border-bottom-left-radius: 5px; color: var(--ink); }
+.msg.a b { font-weight: 600; }
+.msg .meta { display: block; font-size: 11px; color: var(--muted); margin-top: 6px; }
+.prop { align-self: stretch; border: 1px solid var(--amber-line); background: #fffdf5; border-radius: 14px; padding: 13px 14px; }
+.prop .ph { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--amber); letter-spacing: .03em; text-transform: uppercase; }
+.prop ul { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.prop li { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.prop li .ar { color: var(--muted); }
+.prop li s { color: var(--muted); text-decoration: none; }
+.prop li b { color: var(--brand-ink); background: #d1fae5; padding: 1px 7px; border-radius: 6px; font-weight: 600; }
+.prop .imp { margin-top: 11px; padding-top: 11px; border-top: 1px dashed var(--amber-line); font-size: 12.5px; color: var(--ink-2); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.prop .imp b { color: var(--brand-ink); font-weight: 650; }
+.prop .acts { display: flex; gap: 8px; margin-top: 12px; }
+.prop .acts .btn { height: 36px; }
+.applied { align-self: stretch; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--brand-ink); background: var(--brand-soft); border: 1px solid var(--brand-line); border-radius: 12px; padding: 8px 12px; }
+.chat-f { padding: 12px 14px 12px; border-top: 1px solid var(--line); background: var(--surface); }
+.compose { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 12px; padding: 5px 5px 5px 13px; background: var(--surface); }
+.compose span { color: #9aa0a8; flex: 1; font-size: 13.5px; }
+.compose .send { width: 36px; height: 36px; border-radius: 9px; background: var(--ink); color: #fff; border: 0; display: grid; place-items: center; }
+.aicost { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; font-size: 11.5px; color: var(--muted); }
+.aicost b { color: var(--ink-2); font-weight: 600; }
+.aicost em { font-style: normal; font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; background: var(--line-soft); padding: 1px 6px; border-radius: 6px; margin-left: 6px; }
+
+/* ----- responsive ----- */
+@media (max-width: 1180px) {
+  .wrap { grid-template-columns: minmax(0, 1fr); }
+  .chat { position: static; height: 640px; }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pair { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 720px) {
+  .top-in { padding: 0 14px; height: 58px; }
+  .top .hide-s { display: none; }
+  .wrap { padding: 14px; gap: 16px; }
+  .title-row h1 { font-size: 22px; }
+  .kpi { padding: 13px 14px; }
+  .kpi .val { font-size: 22px; }
+  .attn { flex-wrap: wrap; }
+  .attn .btn { margin-left: 0; width: 100%; }
+  .search { width: 100%; margin-left: 0; order: 3; }
+  .tbar { padding: 14px 14px 10px; }
+  .filters { padding: 0 14px 10px; flex-wrap: nowrap; overflow-x: auto; }
+  .filters .sort { display: none; }
+  .assume { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
+  .assume .chip { flex: none; }
+  tbody th, thead th:first-child { position: sticky; left: 0; z-index: 2; background: var(--surface); box-shadow: 1px 0 0 var(--line-soft); }
+  thead th:first-child { background: var(--surface-2); z-index: 3; }
+  tr.updated th { background: #f1fbf6 !important; }
+  .item { min-width: 150px; }
+  .mono { display: none; }
+  .chat { height: 600px; }
+  .panel { padding: 14px 14px 4px; }
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand">
+      <svg class="i" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+      <div><b>Menu Profit</b><small>RESTAURANT AUDITS</small></div>
+    </div>
+    <span class="chip hide-s"><svg class="i sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>Deleted automatically in 2 days</span>
+    <button class="btn hide-s"><svg class="i" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>Copy secure link</button>
+    <button class="btn ghost hide-s"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></svg>New analysis</button>
+    <button class="btn primary"><svg class="i" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>Download Excel <small class="hide-s" id="h-rev"></small></button>
+  </div>
+</header>
+
+<div class="wrap">
+  <main class="main" id="main"></main>
+  <aside class="card chat" id="chat" aria-label="Assistant"></aside>
+</div>
+
+<script>
+/* ============================ data (the dummy dataset) ============================ */
+// name, category, menu price (gross, incl. VAT), units sold, POS net sales; then the cost the client has given.
+// cost: number = entered by hand ("set"), {est:number} = AI estimate, null = not known yet.
+const FOOD = 0.135, DRINK = 0.23;
+const raw = [
+  ['Craft Lager (Pint)', 'Drinks', 6.20, 780, 3931.71, 1.30],
+  ['House Fries', 'Sides', 4.50, 640, 2537.44, 0.85],
+  ['Classic Burger', 'Mains', 14.50, 520, 6643.17, 4.60, 'set', 'updated'],
+  ['Garlic Bread', 'Starters', 5.50, 340, 1647.58, 1.35],
+  ['House Red Wine (Glass)', 'Drinks', 7.50, 330, 2012.20, 2.60, 'set'],
+  ['Margherita Pizza', 'Mains', 11.50, 310, 3140.97, 3.40],
+  ['Fish & Chips', 'Mains', 15.50, 290, 3960.35, 6.10, null, 'editing'],
+  ['Chicken Wings', 'Starters', 9.50, 260, 2176.21, 3.20],
+  ['Chicken Caesar Salad', 'Mains', 12.50, 230, 2533.04, null],
+  ['Craft Lager (Half)', 'Drinks', 3.50, 210, 597.56, 0.70],
+  ['Soup of the Day', 'Starters', 7.50, 210, 1387.67, { est: 2.90 }],
+  ['Beef Lasagne', 'Mains', 14.00, 180, 2220.26, null],
+  ['Side Salad', 'Sides', 4.00, 150, 528.63, 0.95],
+  ['Cheesecake', 'Desserts', 6.50, 140, 801.76, null],
+  ['Chocolate Brownie', 'Desserts', 6.00, 120, 634.36, 1.60],
+  ['Veggie Curry', 'Mains', 13.00, 95, 1088.11, null],
+  ['Coca-Cola', 'Drinks', 3.20, 0, 0, 0.45],
+];
+const unmatched = [{ name: 'COKE', units: 410, net: 1066.67 }, { name: 'Service Charge', units: 1, net: 412.00 }, { name: 'Staff Meal', units: 36, net: 0 }];
+
+/* ============================ the engine's rules, in brief ============================ */
+function compute(rows, linkCoke) {
+  const items = rows.map(r => {
+    const [name, cat, gross, units0, rev0, cost0, flag, state] = r;
+    const vat = cat === 'Drinks' ? DRINK : FOOD;
+    let units = units0, rev = rev0;
+    if (name === 'Coca-Cola' && linkCoke) { units = 410; rev = 1066.67; }
+    const net = gross / (1 + vat);
+    const cost = cost0 === null ? null : (typeof cost0 === 'object' ? cost0.est : cost0);
+    const gp = cost === null ? null : net - cost;
+    return { name, cat, gross, vat, units, rev, net, cost, est: cost0 && typeof cost0 === 'object', set: flag === 'set', state, gp, gpPct: gp === null ? null : gp / net * 100 };
+  });
+  // Kasavana–Smith, per category (backend/src/costing/engine/menu-engineering.ts)
+  const cats = {};
+  items.forEach(i => (cats[i.cat] ||= []).push(i));
+  Object.values(cats).forEach(ms => {
+    const sold = ms.filter(i => i.units > 0); if (!sold.length) return;
+    const catUnits = sold.reduce((s, i) => s + i.units, 0);
+    const pop = 0.7 / sold.length * 100;
+    const costed = sold.filter(i => i.gp !== null);
+    const cu = costed.reduce((s, i) => s + i.units, 0); if (!cu) return;
+    const avg = costed.reduce((s, i) => s + i.gp * i.units, 0) / cu;
+    costed.forEach(i => { const popular = i.units / catUnits * 100 >= pop, profitable = i.gp >= avg; i.cls = popular ? (profitable ? 'star' : 'plow') : (profitable ? 'puzzle' : 'dog'); });
+  });
+  const unmatchedLeft = linkCoke ? unmatched.filter(u => u.name !== 'COKE') : unmatched;
+  const itemRev = items.reduce((s, i) => s + i.rev, 0);
+  const totalRev = itemRev + unmatchedLeft.reduce((s, u) => s + u.net, 0);
+  const totalUnits = items.reduce((s, i) => s + i.units, 0) + unmatchedLeft.reduce((s, u) => s + u.units, 0);
+  const costedItems = items.filter(i => i.cost !== null);
+  const costedRev = costedItems.reduce((s, i) => s + i.rev, 0);
+  const gp = costedItems.reduce((s, i) => s + (i.rev - i.cost * i.units), 0);
+  return { items, totalRev, totalUnits, costedItems, costedRev, gp, gpPct: costedRev ? gp / costedRev * 100 : null, coverage: costedRev / totalRev * 100, unmatchedLeft, itemRev };
+}
+const S = compute(raw, false);
+// What the pending chat proposal would do: link COKE to Coca-Cola, Fish & Chips 290 -> 300 units.
+const raw2 = raw.map(r => r[0] === 'Fish & Chips' ? [r[0], r[1], r[2], 300, r[4] / 290 * 300, r[5], r[6], r[7]] : r);
+const S2 = compute(raw2, true);
+
+/* ============================ helpers ============================ */
+const eur = (v, d = 2) => '€' + v.toLocaleString('en-IE', { minimumFractionDigits: d, maximumFractionDigits: d });
+const nf = v => v.toLocaleString('en-IE', { maximumFractionDigits: 0 });
+const pc = v => v.toFixed(1) + '%';
+const ICON = {
+  pen: '<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>', x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  warn: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+  spark: '<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>',
+  send: '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/>',
+  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>', plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  trash: '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+  trend: '<path d="M22 7 13.5 15.5 8.5 10.5 2 17"/><path d="M16 7h6v6"/>',
+  coin: '<circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/>',
+  utensils: '<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/>',
+  gauge: '<path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>',
+  arrow: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>', chev: '<path d="m6 9 6 6 6-6"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  chart: '<path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>',
+};
+const svg = (n, c = '') => `<svg class="i ${c}" viewBox="0 0 24 24">${ICON[n]}</svg>`;
+const TINT = { Drinks: ['#e0f2fe', '#0369a1'], Mains: ['#ffedd5', '#c2410c'], Starters: ['#fef9c3', '#a16207'], Sides: ['#dcfce7', '#15803d'], Desserts: ['#fce7f3', '#be185d'] };
+const CLS = { star: 'Star', plow: 'Plowhorse', puzzle: 'Puzzle', dog: 'Dog' };
+const barColor = p => p >= 70 ? '#10b981' : p >= 60 ? '#84cc16' : '#f59e0b';
+
+/* ============================ main column ============================ */
+const missing = S.items.filter(i => i.cost === null && i.units > 0);
+const best = [...S.items].sort((a, b) => b.units - a.units);
+const sorted = best; // best sellers first, as today
+const edited = S.items.filter(i => i.set).length;
+
+function kpis() {
+  const unlinkedRev = S.unmatchedLeft.reduce((s, u) => s + u.net, 0), unlinkedUnits = S.unmatchedLeft.reduce((s, u) => s + u.units, 0);
+  return `<section class="kpis" aria-label="Headline figures">
+    <div class="card kpi"><div class="row"><span class="chipi green">${svg('trend', 'lg')}</span>Net revenue</div>
+      <div class="val num">${eur(S.totalRev)}</div><div class="sub"><b>${eur(unlinkedRev)}</b> of it is not linked to a menu item yet</div></div>
+    <div class="card kpi"><div class="row"><span class="chipi blue">${svg('utensils', 'lg')}</span>Items sold</div>
+      <div class="val num">${nf(S.totalUnits)}</div><div class="sub">${S.items.length} menu items · <b>${nf(unlinkedUnits)}</b> sold but not linked</div></div>
+    <div class="card kpi hero"><div class="row"><span class="chipi green">${svg('coin', 'lg')}</span>Gross profit <span class="badge green">${pc(S.gpPct)}</span></div>
+      <div class="val num">${eur(S.gp)}</div><div class="sub">On the <b>${S.costedItems.length} of ${S.items.length}</b> dishes with a cost</div></div>
+    <div class="card kpi"><div class="row"><span class="chipi amber">${svg('gauge', 'lg')}</span>Cost coverage</div>
+      <div class="val num">${S.costedItems.length} <span style="font-size:15px;color:var(--muted);font-weight:500">of ${S.items.length} dishes</span></div>
+      <div class="meter" role="img" aria-label="${pc(S.coverage)} of revenue has a cost"><i style="width:${S.coverage.toFixed(1)}%"></i></div>
+      <div class="sub"><b>${pc(S.coverage)}</b> of revenue · ${missing.length} dishes still need a cost</div></div>
+  </section>`;
+}
+
+function attention() {
+  return `<section class="card attn" aria-label="What needs attention">
+    <div class="ico">${svg('warn', 'lg')}</div>
+    <div><h2>5 things need attention</h2>
+      <p>The profit figures above are for the dishes with a cost. Complete these to see the whole menu.</p>
+      <div class="tags"><span class="tag rose">1 to fix first</span><span class="tag amber">2 warnings</span><span class="tag gray">2 notes</span></div></div>
+    <button class="btn">Review ${svg('arrow')}</button></section>`;
+}
+
+function assumptions() {
+  return `<div class="assume" aria-label="Assumptions used"><span>Calculated with</span>
+    <span class="chip">VAT <b>13.5%</b> food · <b>23%</b> drinks</span>
+    <span class="chip">Menu prices <b>include VAT</b></span>
+    <span class="chip">Ingredient price <b>latest invoice</b></span>
+    <span class="chip">Wastage <b>0%</b></span>
+    <a class="link" href="#">Change with the assistant</a></div>`;
+}
+
+function costCell(i) {
+  if (i.state === 'editing') return `<td><span class="editor"><input value="${i.cost.toFixed(2)}" aria-label="Cost per portion of ${i.name}"><button class="ib ok" aria-label="Save">${svg('check')}</button><button class="ib" aria-label="Cancel">${svg('x')}</button></span><span class="editor-note">↵ save · Esc cancel</span></td>`;
+  if (i.cost === null) return `<td><button class="addcost">${svg('plus', 'sm')}Add cost</button></td>`;
+  const tag = i.set ? '<span class="tagx">set</span>' : i.est ? '<span class="tagx">est.</span>' : '';
+  return `<td><button class="cell-btn" title="${i.set ? 'Entered by you' : i.est ? 'AI estimate — confirm or correct it' : 'From your recipe'}">${eur(i.cost)}${tag}<span class="pen">${svg('pen', 'sm')}</span></button></td>`;
+}
+
+function row(i) {
+  const [bg, fg] = TINT[i.cat];
+  const ed = (txt, hot) => `<button class="cell-btn ${hot ? 'hot' : ''}">${txt}<span class="pen">${svg('pen', 'sm')}</span></button>`;
+  let cls = i.cls ? `<span class="cls ${i.cls}"><i></i>${CLS[i.cls]}</span>` : i.cost === null ? `<span class="cls need"><i></i>Needs cost</span>` : `<span class="cls link">${svg('link', 'sm')}Not linked</span>`;
+  const gpTxt = i.gp === null ? '<span class="dash">—</span>' : eur(i.gp);
+  const pcTxt = i.gpPct === null ? '<span class="dash">—</span>' : `<span class="gp"><span class="bar"><i style="width:${Math.min(100, i.gpPct)}%;background:${barColor(i.gpPct)}"></i></span>${pc(i.gpPct)}</span>`;
+  return `<tr class="${i.state || ''}">
+    <th scope="row"><div class="item"><span class="mono" style="background:${bg};color:${fg}">${i.name[0]}</span><span><span class="nm">${ed(i.name)}${i.state === 'updated' ? '<span class="upd">Updated</span>' : ''}</span><span class="ct">${i.cat}</span></span></div></th>
+    <td>${ed(nf(i.units))}</td><td>${ed(eur(i.gross))}</td><td class="num">${eur(i.net)}</td>
+    ${costCell(i)}<td class="num">${gpTxt}</td><td class="num">${pcTxt}</td><td class="num">${i.rev ? eur(i.rev) : '<span class="dash">—</span>'}</td><td style="text-align:left">${cls}</td></tr>`;
+}
+
+function table() {
+  const matchedUnits = S.items.reduce((s, i) => s + i.units, 0);
+  return `<section class="card tcard" aria-label="Menu items">
+    <div class="tbar"><h2>Menu items <span class="count">${S.items.length}</span></h2>
+      <label class="search">${svg('search')}<input placeholder="Search dishes" aria-label="Search dishes"></label></div>
+    <div class="filters" role="group" aria-label="Filter">
+      <button class="pill-btn on">All <span class="n">${S.items.length}</span></button>
+      <button class="pill-btn">Needs a cost <span class="n">${S.items.filter(i => i.cost === null).length}</span></button>
+      <button class="pill-btn">Estimated <span class="n">${S.items.filter(i => i.est).length}</span></button>
+      <button class="pill-btn">Edited by you <span class="n">${edited}</span></button>
+      <span class="sort">Sorted by <b>Units sold</b> ${svg('chev', 'sm')}</span></div>
+    <div class="tscroll"><table>
+      <caption style="display:none">Menu items with their sales, price, cost and profit. Names, units sold, menu prices and costs can be edited.</caption>
+      <thead><tr><th scope="col">Item</th><th scope="col" class="sorted">Sold</th><th scope="col">Menu price</th><th scope="col" title="Menu price without VAT">Net price</th><th scope="col" title="Cost of one portion">Cost</th><th scope="col">GP / portion</th><th scope="col">GP %</th><th scope="col" title="Net revenue from your POS report">Revenue</th><th scope="col" style="text-align:left">Class</th></tr></thead>
+      <tbody>${sorted.map(row).join('')}</tbody>
+      <tfoot><tr><td>All ${S.items.length} dishes</td><td class="num">${nf(matchedUnits)}</td><td></td><td></td><td></td><td></td><td class="num">${pc(S.gpPct)}<span class="tagx" style="font-weight:400"> on costed</span></td><td class="num">${eur(S.itemRev)}</td><td></td></tr></tfoot>
+    </table></div>
+    <div class="legend"><span><b>Dotted underline</b> click to edit</span><span><b>est.</b> estimated, hover for why</span><span><b>set</b> entered by you</span><span><b>—</b> not known yet, never zero</span><span>Revenue excludes ${eur(S.unmatchedLeft.reduce((s, u) => s + u.net, 0))} not linked to a dish</span></div>
+  </section>`;
+}
+
+function issues() {
+  const top3 = missing.slice(0, 3).map(i => i.name).join(', ');
+  return `<section class="card panel" aria-label="Issues">
+    <h2>What to look at <span class="count">5</span></h2>
+    <div class="issue"><span class="ic rose">${svg('warn')}</span><div><p><b>“COKE”</b> (410 sold, 2.8% of revenue) is not linked to a menu item. It is probably <b>Coca-Cola</b>.</p>
+      <div class="acts"><button class="btn sm">${svg('spark', 'sm')}Ask the assistant to link it</button></div></div></div>
+    <div class="issue"><span class="ic amber">${svg('warn')}</span><div><p><b>${missing.length} dishes have no cost</b>, so their profit is unknown. Best sellers first: ${top3}.</p>
+      <div class="acts"><button class="btn sm">Show these dishes</button></div></div></div>
+    <div class="issue"><span class="ic amber">${svg('warn')}</span><div><p>The cost of <b>Soup of the Day</b> is an estimate, not your figure.</p>
+      <div class="acts"><button class="btn sm">Check it in the table</button></div></div></div>
+    <div class="issue"><span class="ic gray">${svg('info')}</span><div><p><b>“Service Charge”</b> (1 sold, 1.1% of revenue) and <b>“Staff Meal”</b> (36 sold) are not linked to a dish. They may not be dishes.</p></div></div>
+  </section>`;
+}
+
+function recs() {
+  // rules from backend/src/costing/engine/recommendations.ts
+  const out = [];
+  S.items.filter(i => i.cls === 'plow').sort((a, b) => b.units - a.units).slice(0, 2).forEach(i => out.push({ k: 'price', kt: 'Price', t: `Raise the price of ${i.name} by €0.50`, b: `Sells well (${nf(i.units)} units) but earns less per portion than its category average.`, imp: 0.5 / (1 + i.vat) * i.units }));
+  S.items.filter(i => i.cost !== null && i.units > 0 && i.cost / i.net * 100 > 35).sort((a, b) => b.cost * b.units - a.cost * a.units).slice(0, 2).forEach(i => out.push({ k: 'cost', kt: 'Cost', t: `Review the recipe or portion of ${i.name}`, b: `Ingredients are ${pc(i.cost / i.net * 100)} of the net price. A 10% cut in cost per portion helps.`, imp: i.cost * 0.1 * i.units }));
+  out.sort((a, b) => b.imp - a.imp);
+  const top = out.slice(0, 3);
+  if (S.coverage < 80) top.push({ k: 'data', kt: 'Data', t: 'Add recipes for your best sellers', b: `Profit can’t be worked out yet for ${missing.slice(0, 4).map(i => i.name).join(', ')}.`, imp: null });
+  return `<section class="card panel" aria-label="Recommendations">
+    <h2>Recommendations</h2>
+    ${top.map(r => `<div class="rec"><div class="h"><span class="k ${r.k}">${r.kt}</span><div><h3>${r.t}</h3><p>${r.b}</p></div>${r.imp ? `<span class="imp num">+${eur(r.imp, 0)}</span>` : ''}</div></div>`).join('')}
+    <p style="margin:4px 0 12px;font-size:11.5px;color:var(--muted)">At the same sales volume. Calculated by rules, not by AI.</p>
+  </section>`;
+}
+
+document.getElementById('main').innerHTML = `
+  <div class="title-row"><div><h1>Menu profitability</h1><p>3 files read · includes 2 confirmed changes</p></div><span class="status"><i></i>Ready</span></div>
+  ${kpis()}${attention()}${assumptions()}${table()}
+  <div class="pair">${issues()}${recs()}</div>
+  <footer class="foot"><span>This analysis and its files are deleted automatically in <b style="color:var(--ink-2)">2 days</b>. Anyone with the link can open it until then.</span>
+    <span class="sp"><button class="btn sm danger">${svg('trash', 'sm')}Delete now</button></span></footer>`;
+document.getElementById('h-rev').textContent = '· 2 changes';
+
+/* ============================ assistant ============================ */
+const burger = S.items.find(i => i.name === 'Classic Burger');
+const dGp = S2.gp - S.gp;
+document.getElementById('chat').innerHTML = `
+  <div class="chat-h"><span class="logo">${svg('spark', 'lg')}</span><div><b>Assistant</b><small>Answers come from your analysis</small></div><span class="live"><i></i>Ready</span></div>
+  <div class="chat-body">
+    <div class="sugg"><button>Which items make me the most profit?</button><button>Which dishes are least profitable?</button><button>What if I raise my best seller by €1?</button></div>
+    <div class="msg u">A burger costs me ${eur(burger.cost)} to make</div>
+    <div class="msg a">I’ve prepared that change for you to confirm: <b>Classic Burger cost = ${eur(burger.cost)}</b> per portion.<span class="meta">10:24</span></div>
+    <div class="applied">${svg('check')}Applied to your analysis</div>
+    <div class="msg u">Link COKE to Coca-Cola and set Fish &amp; Chips to 300 sold</div>
+    <div class="msg a">I’ve prepared both changes. <b>Nothing is saved until you confirm.</b><span class="meta">10:26</span></div>
+    <div class="prop"><div class="ph">${svg('warn', 'sm')}Waiting for your OK</div>
+      <ul>
+        <li><b style="background:none;color:inherit;padding:0">COKE</b><span class="ar">${svg('arrow', 'sm')}</span><b>Coca-Cola</b><span style="margin-left:auto;color:var(--muted);font-size:12px">410 sold · ${eur(1066.67)}</span></li>
+        <li>Fish &amp; Chips sold<span style="margin-left:auto;display:flex;align-items:center;gap:8px"><s class="num">290</s><span class="ar">${svg('arrow', 'sm')}</span><b class="num">300</b></span></li>
+      </ul>
+      <div class="imp">Gross profit <s class="num" style="color:var(--muted);text-decoration:none">${eur(S.gp)}</s> ${svg('arrow', 'sm')} <b class="num">${eur(S2.gp)}</b> <span style="color:var(--brand-ink)">(+${eur(dGp)})</span></div>
+      <div class="acts"><button class="btn primary">${svg('check')}Apply changes</button><button class="btn">Discard</button></div></div>
+  </div>
+  <div class="chat-f"><div class="compose"><span>Ask a question or describe a correction…</span><button class="send" aria-label="Send">${svg('send')}</button></div>
+    <div class="aicost"><span>AI cost of this analysis <b class="num">$0.079</b></span><em>testing</em></div></div>`;
+</script>
+</body>
+</html>

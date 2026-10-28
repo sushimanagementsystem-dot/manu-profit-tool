@@ -64,6 +64,7 @@ See ADR-022.
 | 8 | Excel and PDF exports | Excel only | [phase-08](phases/phase-08-excel-and-pdf-exports.md) |
 | 9 | n8n final workflows and end-to-end integration | minimal | [phase-09](phases/phase-09-n8n-and-e2e-integration.md) |
 | 10 | Security, automatic cleanup, testing, deployment, operations | basic cleanup + guard | [phase-10](phases/phase-10-security-cleanup-deploy-ops.md) |
+| 11 | Analysis screen redesign (this one screen only; prototype in [screens/](screens/README.md)) | ✔ prototype done, build pending approval | [phase-11](phases/phase-11-analysis-screen-redesign.md) |
 
 **Adjustments from the brief's suggested order (after the audit):**
 - The n8n extraction workflow is built in Phase 3, not Phase 9, because extraction cannot be tested without it.
